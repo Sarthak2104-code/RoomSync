@@ -17,8 +17,8 @@ import com.roomsync.room.exception.RoomAlreadyLockedException;
 import com.roomsync.room.exception.RoomAlreadyUnlockedException;
 import com.roomsync.room.exception.RoomNotFoundException;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +64,8 @@ class RoomServiceTest {
     private Location locationMumbai;
     private Location locationPune;
     private Location inactiveLocation;
+    private Role userRole;
+    private Role adminRole;
     private User mumbaiUser;
     private User puneUser;
     private User adminUser;
@@ -73,13 +75,16 @@ class RoomServiceTest {
 
     @BeforeEach
     void setUp() {
-        locationMumbai = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).build();
-        locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).build();
-        inactiveLocation = Location.builder().id(3L).name("Delhi").code("DEL").active(false).build();
+        userRole = Role.builder().id(1L).name("USER").build();
+        adminRole = Role.builder().id(2L).name("ADMIN").build();
 
-        mumbaiUser = User.builder().id(10L).name("Alice").email("alice@mumbai.com").role(UserRole.USER).location(locationMumbai).build();
-        puneUser = User.builder().id(20L).name("Bob").email("bob@pune.com").role(UserRole.USER).location(locationPune).build();
-        adminUser = User.builder().id(30L).name("Admin").email("admin@roomsync.com").role(UserRole.ADMIN).location(locationMumbai).build();
+        locationMumbai = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).timezone("Asia/Kolkata").build();
+        locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).timezone("Asia/Kolkata").build();
+        inactiveLocation = Location.builder().id(3L).name("Delhi").code("DEL").active(false).timezone("Asia/Kolkata").build();
+
+        mumbaiUser = User.builder().id(10L).name("Alice").email("alice@mumbai.com").role(userRole).location(locationMumbai).build();
+        puneUser = User.builder().id(20L).name("Bob").email("bob@pune.com").role(userRole).location(locationPune).build();
+        adminUser = User.builder().id(30L).name("Admin").email("admin@roomsync.com").role(adminRole).location(locationMumbai).build();
 
         availableRoom = Room.builder()
                 .id(1L)

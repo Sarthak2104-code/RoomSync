@@ -83,7 +83,7 @@ public class BookingService {
             );
         }
 
-        if (user.getRole() == UserRole.USER && !room.getLocation().getId().equals(user.getLocation().getId())) {
+        if (user.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(user.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User cannot book a room in another location");
         }
 
@@ -110,6 +110,7 @@ public class BookingService {
                 .user(user)
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
+                .reason(request.getReason())
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
@@ -127,7 +128,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
-        if (user.getRole() == UserRole.USER) {
+        if (user.getRoleEnum() == UserRole.USER) {
             if (!booking.getUser().getId().equals(userId)) {
                 throw new UnauthorizedBookingOperationException("User is not authorized to access this booking");
             }
@@ -158,7 +159,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
-        if (user.getRole() == UserRole.USER) {
+        if (user.getRoleEnum() == UserRole.USER) {
             if (!booking.getUser().getId().equals(userId)) {
                 throw new UnauthorizedBookingOperationException("User is not authorized to modify this booking");
             }
@@ -214,7 +215,7 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
-        if (user.getRole() == UserRole.USER) {
+        if (user.getRoleEnum() == UserRole.USER) {
             if (!booking.getUser().getId().equals(userId)) {
                 throw new UnauthorizedBookingOperationException("User is not authorized to cancel this booking");
             }

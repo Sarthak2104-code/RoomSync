@@ -22,8 +22,13 @@ public class BookingResponse {
     private Long roomId;
     private String roomName;
     private Long userId;
+    private Long seriesId;
+    private Integer occurrenceIndex;
     private OffsetDateTime startTime;
     private OffsetDateTime endTime;
+    private String reason;
+    private String cancelledReason;
+    private Long rescheduledFromId;
     private BookingStatus status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -40,8 +45,13 @@ public class BookingResponse {
                 .roomId(booking.getRoom() != null ? booking.getRoom().getId() : null)
                 .roomName(booking.getRoom() != null ? booking.getRoom().getName() : null)
                 .userId(booking.getUser() != null ? booking.getUser().getId() : null)
+                .seriesId(booking.getSeries() != null ? booking.getSeries().getId() : null)
+                .occurrenceIndex(booking.getOccurrenceIndex())
                 .startTime(booking.getStartTime())
                 .endTime(booking.getEndTime())
+                .reason(booking.getReason())
+                .cancelledReason(booking.getCancelledReason())
+                .rescheduledFromId(booking.getRescheduledFrom() != null ? booking.getRescheduledFrom().getId() : null)
                 .status(effectiveStatus)
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())

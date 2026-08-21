@@ -20,8 +20,8 @@ import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.exception.RoomNotFoundException;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
 import com.roomsync.user.exception.UserNotFoundException;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +70,7 @@ class BookingServiceTest {
 
     private Location locationMumbai;
     private Location locationPune;
+    private Role userRole;
     private User user1;
     private User user2;
     private Room activeAvailableRoom;
@@ -80,11 +81,13 @@ class BookingServiceTest {
     void setUp() {
         bookingService = new BookingService(bookingRepository, roomRepository, userRepository, clock);
 
-        locationMumbai = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).build();
-        locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).build();
+        userRole = Role.builder().id(1L).name("USER").build();
 
-        user1 = User.builder().id(1L).name("User One").email("user1@example.com").password("pass").role(UserRole.USER).location(locationMumbai).build();
-        user2 = User.builder().id(2L).name("User Two").email("user2@example.com").password("pass").role(UserRole.USER).location(locationPune).build();
+        locationMumbai = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).timezone("Asia/Kolkata").build();
+        locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).timezone("Asia/Kolkata").build();
+
+        user1 = User.builder().id(1L).name("User One").email("user1@example.com").password("pass").role(userRole).location(locationMumbai).build();
+        user2 = User.builder().id(2L).name("User Two").email("user2@example.com").password("pass").role(userRole).location(locationPune).build();
 
         activeAvailableRoom = Room.builder()
                 .id(10L)
@@ -128,6 +131,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(startTime)
                     .endTime(endTime)
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -145,6 +149,7 @@ class BookingServiceTest {
             assertThat(response.getId()).isEqualTo(100L);
             assertThat(response.getRoomId()).isEqualTo(10L);
             assertThat(response.getUserId()).isEqualTo(1L);
+            assertThat(response.getReason()).isEqualTo("Sprint Planning");
             assertThat(response.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         }
 
@@ -158,6 +163,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(startTime)
                     .endTime(endTime)
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(2L)).thenReturn(Optional.of(user2));
@@ -174,6 +180,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(99L)).thenReturn(Optional.empty());
@@ -189,6 +196,7 @@ class BookingServiceTest {
                     .roomId(99L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -205,6 +213,7 @@ class BookingServiceTest {
                     .roomId(30L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -222,6 +231,7 @@ class BookingServiceTest {
                     .roomId(20L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -239,6 +249,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -256,6 +267,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T10:10:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -272,6 +284,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:05:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T10:30:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -289,6 +302,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:15:30Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T10:45:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -306,6 +320,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(OffsetDateTime.parse("2026-08-20T08:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T08:30:00Z"))
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -326,6 +341,7 @@ class BookingServiceTest {
                     .roomId(10L)
                     .startTime(startTime)
                     .endTime(endTime)
+                    .reason("Sprint Planning")
                     .build();
 
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
@@ -353,6 +369,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 
@@ -375,6 +392,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T07:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T08:00:00Z"))
+                    .reason("Past Meeting")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 
@@ -395,6 +413,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 
@@ -419,6 +438,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 
@@ -447,6 +467,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 
@@ -483,6 +504,7 @@ class BookingServiceTest {
                     .room(activeAvailableRoom)
                     .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                     .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
                     .status(BookingStatus.CONFIRMED)
                     .build();
 

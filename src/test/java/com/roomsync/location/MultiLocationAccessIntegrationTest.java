@@ -10,8 +10,9 @@ import com.roomsync.room.dto.CreateRoomRequest;
 import com.roomsync.room.dto.RoomResponse;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.repository.RoleRepository;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +57,9 @@ class MultiLocationAccessIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private RoomRepository roomRepository;
 
     @Autowired
@@ -71,14 +75,19 @@ class MultiLocationAccessIntegrationTest {
     void setUp() {
         jdbcTemplate.execute("TRUNCATE bookings, rooms, users, locations RESTART IDENTITY CASCADE");
 
-        mumbaiLoc = locationRepository.save(Location.builder().name("Mumbai").code("MUM").active(true).build());
-        puneLoc = locationRepository.save(Location.builder().name("Pune").code("PUN").active(true).build());
+        mumbaiLoc = locationRepository.save(Location.builder().name("Mumbai").code("MUM").active(true).timezone("Asia/Kolkata").build());
+        puneLoc = locationRepository.save(Location.builder().name("Pune").code("PUN").active(true).timezone("Asia/Kolkata").build());
+
+        Role userRole = roleRepository.findByName("USER").orElseGet(() ->
+                roleRepository.save(Role.builder().name("USER").build()));
+        Role adminRole = roleRepository.findByName("ADMIN").orElseGet(() ->
+                roleRepository.save(Role.builder().name("ADMIN").build()));
 
         mumbaiUser = userRepository.save(User.builder()
                 .name("Alice Mumbai")
                 .email("alice@mumbai.com")
                 .password("hash")
-                .role(UserRole.USER)
+                .role(userRole)
                 .location(mumbaiLoc)
                 .build());
 
@@ -86,7 +95,7 @@ class MultiLocationAccessIntegrationTest {
                 .name("Bob Pune")
                 .email("bob@pune.com")
                 .password("hash")
-                .role(UserRole.USER)
+                .role(userRole)
                 .location(puneLoc)
                 .build());
 
@@ -94,7 +103,7 @@ class MultiLocationAccessIntegrationTest {
                 .name("Global Admin")
                 .email("admin@roomsync.com")
                 .password("hash")
-                .role(UserRole.ADMIN)
+                .role(adminRole)
                 .location(mumbaiLoc)
                 .build());
     }
@@ -214,6 +223,7 @@ class MultiLocationAccessIntegrationTest {
                                 .roomId(mumbaiRoomId)
                                 .startTime(startTime)
                                 .endTime(endTime)
+                                .reason("Mumbai Project Kickoff")
                                 .build())))
                 .andExpect(status().isCreated());
 
@@ -225,6 +235,7 @@ class MultiLocationAccessIntegrationTest {
                                 .roomId(puneRoomId)
                                 .startTime(startTime)
                                 .endTime(endTime)
+                                .reason("Cross-location booking attempt")
                                 .build())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
@@ -237,6 +248,7 @@ class MultiLocationAccessIntegrationTest {
                                 .roomId(puneRoomId)
                                 .startTime(startTime)
                                 .endTime(endTime)
+                                .reason("Admin Inspection")
                                 .build())))
                 .andExpect(status().isCreated());
     }
@@ -291,6 +303,7 @@ class MultiLocationAccessIntegrationTest {
                                 .roomId(puneRoomId)
                                 .startTime(startTime)
                                 .endTime(endTime)
+                                .reason("Booking in inactive location")
                                 .build())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("inactive")));
@@ -306,8 +319,8 @@ class MultiLocationAccessIntegrationTest {
         OffsetDateTime start = OffsetDateTime.parse("2026-08-30T10:00:00Z");
         OffsetDateTime end = OffsetDateTime.parse("2026-08-30T11:00:00Z");
 
-        CreateBookingRequest mumReq = CreateBookingRequest.builder().roomId(mumbaiRoom.getId()).startTime(start).endTime(end).build();
-        CreateBookingRequest punReq = CreateBookingRequest.builder().roomId(puneRoom.getId()).startTime(start).endTime(end).build();
+        CreateBookingRequest mumReq = CreateBookingRequest.builder().roomId(mumbaiRoom.getId()).startTime(start).endTime(end).reason("Mumbai Sync").build();
+        CreateBookingRequest punReq = CreateBookingRequest.builder().roomId(puneRoom.getId()).startTime(start).endTime(end).reason("Pune Sync").build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);

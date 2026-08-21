@@ -8,8 +8,9 @@ import com.roomsync.location.repository.LocationRepository;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.repository.RoleRepository;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +61,9 @@ class BookingConcurrencyTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private RoomRepository roomRepository;
 
     @Autowired
@@ -78,7 +82,11 @@ class BookingConcurrencyTest {
                 .name("Mumbai")
                 .code("MUM")
                 .active(true)
+                .timezone("Asia/Kolkata")
                 .build());
+
+        Role userRole = roleRepository.findByName("USER").orElseGet(() ->
+                roleRepository.save(Role.builder().name("USER").build()));
 
         users = new ArrayList<>();
         for (int i = 1; i <= 15; i++) {
@@ -86,7 +94,7 @@ class BookingConcurrencyTest {
                     .name("User " + i)
                     .email("user" + i + "@roomsync.com")
                     .password("pass" + i)
-                    .role(UserRole.USER)
+                    .role(userRole)
                     .location(location)
                     .build()));
         }
@@ -118,6 +126,7 @@ class BookingConcurrencyTest {
                 .roomId(room1.getId())
                 .startTime(startTime)
                 .endTime(endTime)
+                .reason("Sprint Planning")
                 .build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -171,8 +180,8 @@ class BookingConcurrencyTest {
         OffsetDateTime startB = OffsetDateTime.parse("2026-08-30T10:30:00Z");
         OffsetDateTime endB = OffsetDateTime.parse("2026-08-30T11:30:00Z");
 
-        CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).build();
-        CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).build();
+        CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).reason("Planning A").build();
+        CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).reason("Planning B").build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -230,8 +239,8 @@ class BookingConcurrencyTest {
         OffsetDateTime startB = OffsetDateTime.parse("2026-08-30T11:00:00Z");
         OffsetDateTime endB = OffsetDateTime.parse("2026-08-30T12:00:00Z");
 
-        CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).build();
-        CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).build();
+        CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).reason("Session A").build();
+        CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).reason("Session B").build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -282,8 +291,8 @@ class BookingConcurrencyTest {
         OffsetDateTime start = OffsetDateTime.parse("2026-08-30T10:00:00Z");
         OffsetDateTime end = OffsetDateTime.parse("2026-08-30T11:00:00Z");
 
-        CreateBookingRequest req1 = CreateBookingRequest.builder().roomId(room1.getId()).startTime(start).endTime(end).build();
-        CreateBookingRequest req2 = CreateBookingRequest.builder().roomId(room2.getId()).startTime(start).endTime(end).build();
+        CreateBookingRequest req1 = CreateBookingRequest.builder().roomId(room1.getId()).startTime(start).endTime(end).reason("Room 1 Booking").build();
+        CreateBookingRequest req2 = CreateBookingRequest.builder().roomId(room2.getId()).startTime(start).endTime(end).reason("Room 2 Booking").build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -336,6 +345,7 @@ class BookingConcurrencyTest {
                 .roomId(room1.getId())
                 .startTime(startTime)
                 .endTime(endTime)
+                .reason("Contention Test Slot")
                 .build();
 
         int threadCount = 10;
@@ -391,6 +401,7 @@ class BookingConcurrencyTest {
                 .roomId(room1.getId())
                 .startTime(OffsetDateTime.parse("2026-08-30T10:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-30T11:00:00Z"))
+                .reason("Booking A")
                 .build();
         String respA = mockMvc.perform(post("/api/bookings")
                         .header("X-User-Id", users.get(0).getId())
@@ -405,6 +416,7 @@ class BookingConcurrencyTest {
                 .roomId(room1.getId())
                 .startTime(OffsetDateTime.parse("2026-08-30T12:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-30T13:00:00Z"))
+                .reason("Booking B")
                 .build();
         String respB = mockMvc.perform(post("/api/bookings")
                         .header("X-User-Id", users.get(1).getId())

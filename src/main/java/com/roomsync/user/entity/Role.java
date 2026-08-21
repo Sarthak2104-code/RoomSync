@@ -1,4 +1,4 @@
-package com.roomsync.location.entity;
+package com.roomsync.user.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,44 +18,24 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.OffsetDateTime;
 
 /**
- * Location Entity representing physical company sites (e.g. Mumbai, Pune, Bangalore).
- * Serves as the organizational and authorization boundary for Users and Rooms.
+ * Role Entity representing system user roles (e.g., USER, ADMIN).
  */
 @Entity
-@Table(name = "locations")
+@Table(name = "roles")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Location {
+public class Role {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, unique = true, length = 50)
     private String name;
-
-    @NotBlank
-    @Column(name = "code", nullable = false, unique = true, length = 50)
-    private String code;
-
-    @Column(name = "address", length = 500)
-    private String address;
-
-    @Builder.Default
-    @NotBlank
-    @Column(name = "timezone", nullable = false, length = 100)
-    private String timezone = "Asia/Kolkata";
-
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
-
-    @Builder.Default
-    @Column(name = "active", nullable = false)
-    private boolean active = true;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

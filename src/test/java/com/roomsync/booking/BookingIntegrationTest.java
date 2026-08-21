@@ -12,8 +12,9 @@ import com.roomsync.location.repository.LocationRepository;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.repository.RoleRepository;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +53,9 @@ class BookingIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private RoomRepository roomRepository;
 
     @Autowired
@@ -74,13 +78,17 @@ class BookingIntegrationTest {
                 .name("Mumbai")
                 .code("MUM")
                 .active(true)
+                .timezone("Asia/Kolkata")
                 .build());
+
+        Role userRole = roleRepository.findByName("USER").orElseGet(() ->
+                roleRepository.save(Role.builder().name("USER").build()));
 
         user1 = userRepository.save(User.builder()
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash1")
-                .role(UserRole.USER)
+                .role(userRole)
                 .location(location)
                 .build());
 
@@ -88,7 +96,7 @@ class BookingIntegrationTest {
                 .name("Bob")
                 .email("bob@roomsync.com")
                 .password("hash2")
-                .role(UserRole.USER)
+                .role(userRole)
                 .location(location)
                 .build());
 
@@ -120,6 +128,7 @@ class BookingIntegrationTest {
                 .roomId(room1.getId())
                 .startTime(slot1Start)
                 .endTime(slot1End)
+                .reason("Quarterly Strategy Alignment")
                 .build();
 
         String responseStr = mockMvc.perform(post("/api/bookings")
@@ -130,6 +139,7 @@ class BookingIntegrationTest {
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.roomId").value(room1.getId()))
                 .andExpect(jsonPath("$.userId").value(user1.getId()))
+                .andExpect(jsonPath("$.reason").value("Quarterly Strategy Alignment"))
                 .andReturn().getResponse().getContentAsString();
 
         BookingResponse createdBooking = objectMapper.readValue(responseStr, BookingResponse.class);
@@ -140,6 +150,7 @@ class BookingIntegrationTest {
                 .roomId(room1.getId())
                 .startTime(slot1Start.plusMinutes(30))
                 .endTime(slot1End.plusMinutes(30))
+                .reason("Conflicting Team Sync")
                 .build();
 
         mockMvc.perform(post("/api/bookings")
@@ -154,6 +165,7 @@ class BookingIntegrationTest {
                 .roomId(room1.getId())
                 .startTime(slot1End)
                 .endTime(slot1End.plusHours(1))
+                .reason("Adjacent Review")
                 .build();
 
         mockMvc.perform(post("/api/bookings")
@@ -166,7 +178,8 @@ class BookingIntegrationTest {
         mockMvc.perform(get("/api/bookings/" + bookingId)
                         .header("X-User-Id", user1.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(bookingId));
+                .andExpect(jsonPath("$.id").value(bookingId))
+                .andExpect(jsonPath("$.reason").value("Quarterly Strategy Alignment"));
 
         // 5. Get Booking by Non-Owner -> 403 FORBIDDEN
         mockMvc.perform(get("/api/bookings/" + bookingId)
@@ -209,6 +222,7 @@ class BookingIntegrationTest {
                 .roomId(room1.getId())
                 .startTime(rescheduleStart)
                 .endTime(rescheduleEnd)
+                .reason("Rebook cancelled slot")
                 .build();
 
         mockMvc.perform(post("/api/bookings")
@@ -222,6 +236,7 @@ class BookingIntegrationTest {
                 .roomId(lockedRoom.getId())
                 .startTime(slot1Start.plusDays(1))
                 .endTime(slot1End.plusDays(1))
+                .reason("Attempt locked room")
                 .build();
 
         mockMvc.perform(post("/api/bookings")

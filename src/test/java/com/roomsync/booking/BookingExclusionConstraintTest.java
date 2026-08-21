@@ -5,8 +5,9 @@ import com.roomsync.location.repository.LocationRepository;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.repository.RoleRepository;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,9 @@ class BookingExclusionConstraintTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private RoomRepository roomRepository;
 
     @Autowired
@@ -54,13 +58,17 @@ class BookingExclusionConstraintTest {
                 .name("Mumbai")
                 .code("MUM")
                 .active(true)
+                .timezone("Asia/Kolkata")
                 .build());
+
+        Role userRole = roleRepository.findByName("USER").orElseGet(() ->
+                roleRepository.save(Role.builder().name("USER").build()));
 
         User user = userRepository.save(User.builder()
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash")
-                .role(UserRole.USER)
+                .role(userRole)
                 .location(location)
                 .build());
         userId = user.getId();
@@ -95,14 +103,14 @@ class BookingExclusionConstraintTest {
 
         // Insert first booking
         jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start1, end1, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start1, end1, "CONFIRMED", "Direct SQL Slot 1"
         );
 
         // Attempt overlapping insert directly via raw SQL
         assertThatThrownBy(() -> jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start2, end2, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start2, end2, "CONFIRMED", "Direct SQL Slot 2"
         ))
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .satisfies(thrown -> {
@@ -125,13 +133,13 @@ class BookingExclusionConstraintTest {
         OffsetDateTime end2 = OffsetDateTime.parse("2026-08-25T12:00:00Z");
 
         jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start1, end1, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start1, end1, "CONFIRMED", "Adjacent Slot 1"
         );
 
         int rowsInserted = jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start2, end2, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start2, end2, "CONFIRMED", "Adjacent Slot 2"
         );
 
         assertThat(rowsInserted).isEqualTo(1);
@@ -145,14 +153,14 @@ class BookingExclusionConstraintTest {
 
         // Cancelled booking
         jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start1, end1, "CANCELLED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start1, end1, "CANCELLED", "Cancelled Slot"
         );
 
         // Confirmed booking for the same time slot
         int rowsInserted = jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start1, end1, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start1, end1, "CONFIRMED", "Active Replacement Slot"
         );
 
         assertThat(rowsInserted).isEqualTo(1);
@@ -165,13 +173,13 @@ class BookingExclusionConstraintTest {
         OffsetDateTime end = OffsetDateTime.parse("2026-08-25T11:00:00Z");
 
         int rows1 = jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room1Id, userId, start, end, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room1Id, userId, start, end, "CONFIRMED", "Room 1 Slot"
         );
 
         int rows2 = jdbcTemplate.update(
-                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-                room2Id, userId, start, end, "CONFIRMED"
+                "INSERT INTO bookings (room_id, user_id, start_time, end_time, status, reason) VALUES (?, ?, ?, ?, ?, ?)",
+                room2Id, userId, start, end, "CONFIRMED", "Room 2 Slot"
         );
 
         assertThat(rows1).isEqualTo(1);

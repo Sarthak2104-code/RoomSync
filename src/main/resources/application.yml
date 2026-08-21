@@ -6,9 +6,9 @@ spring:
     name: roomsync
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:roomsync_db}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:roomsync_db}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:Sarthak1@}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:

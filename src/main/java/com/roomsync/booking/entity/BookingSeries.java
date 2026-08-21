@@ -1,6 +1,5 @@
 package com.roomsync.booking.entity;
 
-import com.roomsync.room.entity.Room;
 import com.roomsync.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,7 +14,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,21 +22,22 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 
 /**
- * Booking Entity representing room reservations.
- * Supports single bookings, recurring occurrence identity via BookingSeries,
- * mandatory non-blank reason, and self-referencing reschedule lineage.
+ * BookingSeries Entity representing recurring booking schedules (DAILY, WEEKLY, MONTHLY).
+ * Bound by either end_date XOR occurrence_count.
  */
 @Entity
-@Table(name = "bookings")
+@Table(name = "booking_series")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Booking {
+public class BookingSeries {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,46 +45,49 @@ public class Booking {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id", nullable = false)
-    private Room room;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "series_id")
-    private BookingSeries series;
-
-    @Column(name = "occurrence_index")
-    private Integer occurrenceIndex;
+    @Column(name = "series_name")
+    private String seriesName;
 
     @NotNull
-    @Column(name = "start_time", nullable = false)
-    private OffsetDateTime startTime;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frequency", nullable = false, length = 50)
+    private RecurrenceFrequency frequency;
 
     @NotNull
-    @Column(name = "end_time", nullable = false)
-    private OffsetDateTime endTime;
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "occurrence_count")
+    private Integer occurrenceCount;
+
+    @NotNull
+    @Column(name = "start_local_time", nullable = false)
+    private LocalTime startLocalTime;
+
+    @NotNull
+    @Column(name = "end_local_time", nullable = false)
+    private LocalTime endLocalTime;
 
     @NotBlank
-    @Size(max = 500)
-    @Column(name = "reason", nullable = false, length = 500)
-    private String reason;
+    @Column(name = "timezone", nullable = false, length = 100)
+    private String timezone;
 
-    @Size(max = 500)
-    @Column(name = "cancelled_reason", length = 500)
-    private String cancelledReason;
+    @Column(name = "days_of_week", length = 100)
+    private String daysOfWeek;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rescheduled_from_id")
-    private Booking rescheduledFrom;
+    @Column(name = "day_of_month")
+    private Integer dayOfMonth;
 
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private BookingStatus status;
+    private BookingSeriesStatus status;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

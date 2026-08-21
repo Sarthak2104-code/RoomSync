@@ -66,7 +66,7 @@ public class RoomService {
             );
         }
 
-        if (caller.getRole() == UserRole.USER && !caller.getLocation().getId().equals(request.getLocationId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !caller.getLocation().getId().equals(request.getLocationId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to create rooms in another location");
         }
 
@@ -97,7 +97,7 @@ public class RoomService {
         Pageable validatedPageable = sanitizePageable(pageable);
         Page<Room> roomPage;
 
-        if (caller.getRole() == UserRole.USER) {
+        if (caller.getRoleEnum() == UserRole.USER) {
             if (locationId != null && !locationId.equals(caller.getLocation().getId())) {
                 throw new UnauthorizedLocationAccessException("User cannot view rooms in another location");
             }
@@ -121,7 +121,7 @@ public class RoomService {
         Room room = roomRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new RoomNotFoundException(id));
 
-        if (caller.getRole() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to access rooms in another location");
         }
 
@@ -136,7 +136,7 @@ public class RoomService {
         Room room = roomRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new RoomNotFoundException(id));
 
-        if (caller.getRole() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to modify rooms in another location");
         }
 
@@ -162,7 +162,7 @@ public class RoomService {
         Room room = roomRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new RoomNotFoundException(id));
 
-        if (caller.getRole() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to lock rooms in another location");
         }
 
@@ -184,7 +184,7 @@ public class RoomService {
         Room room = roomRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new RoomNotFoundException(id));
 
-        if (caller.getRole() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to unlock rooms in another location");
         }
 
@@ -206,7 +206,7 @@ public class RoomService {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new RoomNotFoundException(id));
 
-        if (caller.getRole() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
             throw new UnauthorizedLocationAccessException("User is not authorized to deactivate rooms in another location");
         }
 

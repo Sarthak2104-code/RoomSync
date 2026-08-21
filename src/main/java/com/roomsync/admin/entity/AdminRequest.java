@@ -1,6 +1,10 @@
-package com.roomsync.room.entity;
+package com.roomsync.admin.entity;
 
+import com.roomsync.booking.entity.Booking;
+import com.roomsync.booking.entity.BookingSeries;
 import com.roomsync.location.entity.Location;
+import com.roomsync.room.entity.Room;
+import com.roomsync.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,13 +14,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,22 +27,18 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
- * Room Entity.
- * Note: Room names are unique per Location (location_id, LOWER(name)),
- * enforced case-insensitively at both application and database levels.
+ * AdminRequest Entity representing administrative escalations and approval requests.
  */
 @Entity
-@Table(name = "rooms")
+@Table(name = "admin_requests")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Room {
+public class AdminRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,38 +46,41 @@ public class Room {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id", nullable = false)
+    @JoinColumn(name = "requester_user_id", nullable = false)
+    private User requesterUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
     private Location location;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private Room room;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_series_id")
+    private BookingSeries bookingSeries;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id")
+    private Booking booking;
+
     @NotBlank
-    @Column(name = "name", nullable = false)
-    private String name;
+    @Column(name = "request_type", nullable = false, length = 100)
+    private String requestType;
 
-    @NotNull
-    @Positive
-    @Column(name = "capacity", nullable = false)
-    private Integer capacity;
-
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @NotBlank
+    @Column(name = "message", nullable = false, columnDefinition = "TEXT")
+    private String message;
 
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private RoomStatus status;
+    private AdminRequestStatus status;
 
-    @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "room_amenities",
-            joinColumns = @JoinColumn(name = "room_id"),
-            inverseJoinColumns = @JoinColumn(name = "amenity_id")
-    )
-    private Set<Amenity> amenities = new HashSet<>();
-
-    @Builder.Default
-    @Column(name = "active", nullable = false)
-    private boolean active = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by_user_id")
+    private User resolvedByUser;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

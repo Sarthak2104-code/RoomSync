@@ -55,6 +55,7 @@ class BookingControllerTest {
                 .roomId(1L)
                 .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                .reason("Header Test")
                 .build();
 
         mockMvc.perform(post("/api/bookings")
@@ -72,6 +73,7 @@ class BookingControllerTest {
                 .roomId(1L)
                 .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                .reason("Header Test")
                 .build();
 
         mockMvc.perform(post("/api/bookings")
@@ -90,6 +92,7 @@ class BookingControllerTest {
                 .roomId(1L)
                 .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                .reason("Architecture Discussion")
                 .build();
 
         BookingResponse response = BookingResponse.builder()
@@ -99,6 +102,7 @@ class BookingControllerTest {
                 .userId(123L)
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
+                .reason("Architecture Discussion")
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
@@ -112,6 +116,7 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.id").value(100))
                 .andExpect(jsonPath("$.roomId").value(1))
                 .andExpect(jsonPath("$.userId").value(123))
+                .andExpect(jsonPath("$.reason").value("Architecture Discussion"))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
     }
 
@@ -122,6 +127,7 @@ class BookingControllerTest {
                 .roomId(1L)
                 .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
                 .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                .reason("Overlap Conflict")
                 .build();
 
         when(bookingService.createBooking(eq(123L), any(CreateBookingRequest.class)))
@@ -143,6 +149,7 @@ class BookingControllerTest {
                 .id(100L)
                 .roomId(1L)
                 .userId(123L)
+                .reason("Client Review")
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
@@ -188,6 +195,7 @@ class BookingControllerTest {
                 .id(100L)
                 .roomId(1L)
                 .userId(123L)
+                .reason("Team Catchup")
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
@@ -224,6 +232,7 @@ class BookingControllerTest {
                 .userId(123L)
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
+                .reason("Rescheduled Meeting")
                 .status(BookingStatus.CONFIRMED)
                 .build();
 

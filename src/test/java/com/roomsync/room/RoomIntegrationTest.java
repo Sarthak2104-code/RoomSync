@@ -8,8 +8,9 @@ import com.roomsync.room.dto.RoomResponse;
 import com.roomsync.room.dto.UpdateRoomRequest;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
-import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.repository.RoleRepository;
 import com.roomsync.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +53,9 @@ class RoomIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Location location;
@@ -65,13 +69,17 @@ class RoomIntegrationTest {
                 .name("Mumbai")
                 .code("MUM")
                 .active(true)
+                .timezone("Asia/Kolkata")
                 .build());
+
+        Role adminRole = roleRepository.findByName("ADMIN").orElseGet(() ->
+                roleRepository.save(Role.builder().name("ADMIN").build()));
 
         adminUser = userRepository.save(User.builder()
                 .name("Admin User")
                 .email("admin@roomsync.com")
                 .password("hash")
-                .role(UserRole.ADMIN)
+                .role(adminRole)
                 .location(location)
                 .build());
     }
