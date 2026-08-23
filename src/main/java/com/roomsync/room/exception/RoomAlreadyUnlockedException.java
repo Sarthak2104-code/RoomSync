@@ -1,7 +1,14 @@
 package com.roomsync.room.exception;
 
-public class RoomAlreadyUnlockedException extends RuntimeException {
+import com.roomsync.common.exception.ErrorCode;
+import com.roomsync.common.exception.RoomSyncException;
+
+public class RoomAlreadyUnlockedException extends RoomSyncException {
     public RoomAlreadyUnlockedException(Long id) {
-        super(String.format("Room with id '%d' is already AVAILABLE", id));
+        super(ErrorCode.ROOM_ALREADY_UNLOCKED, String.format("Room with id '%d' is already UNLOCKED", id));
+    }
+
+    public RoomAlreadyUnlockedException(String message) {
+        super(ErrorCode.ROOM_ALREADY_UNLOCKED, message);
     }
 }

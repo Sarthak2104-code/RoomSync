@@ -1,34 +1,19 @@
 package com.roomsync.common.exception;
 
-import com.roomsync.booking.exception.BookingAlreadyCancelledException;
-import com.roomsync.booking.exception.BookingAlreadyCompletedException;
-import com.roomsync.booking.exception.BookingNotFoundException;
-import com.roomsync.booking.exception.BookingOverlapException;
-import com.roomsync.booking.exception.InvalidBookingTimeException;
-import com.roomsync.booking.exception.RoomNotBookableException;
-import com.roomsync.booking.exception.UnauthorizedBookingOperationException;
+import com.roomsync.common.filter.CorrelationContext;
 import com.roomsync.common.response.ErrorResponse;
-import com.roomsync.location.exception.DuplicateLocationCodeException;
-import com.roomsync.location.exception.DuplicateLocationNameException;
-import com.roomsync.location.exception.LocationAlreadyInactiveException;
-import com.roomsync.location.exception.LocationNotActiveException;
-import com.roomsync.location.exception.LocationNotFoundException;
-import com.roomsync.location.exception.UnauthorizedLocationAccessException;
-import com.roomsync.room.exception.DuplicateRoomNameException;
-import com.roomsync.room.exception.RoomAlreadyInactiveException;
-import com.roomsync.room.exception.RoomAlreadyLockedException;
-import com.roomsync.room.exception.RoomAlreadyUnlockedException;
-import com.roomsync.room.exception.RoomNotFoundException;
-import com.roomsync.user.exception.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.postgresql.util.PSQLException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -37,70 +22,34 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Centralized Global Exception Handler for all RoomSync REST endpoints.
+ * Produces standardized ErrorResponse payloads with machine-readable error codes and correlation tracking.
+ */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({
-            RoomNotFoundException.class,
-            UserNotFoundException.class,
-            BookingNotFoundException.class,
-            LocationNotFoundException.class
-    })
-    public ResponseEntity<ErrorResponse> handleNotFoundExceptions(RuntimeException ex, HttpServletRequest request) {
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(OffsetDateTime.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error(HttpStatus.NOT_FOUND.name())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-    }
+    @ExceptionHandler(RoomSyncException.class)
+    public ResponseEntity<ErrorResponse> handleRoomSyncException(RoomSyncException ex, HttpServletRequest request) {
+        HttpStatus status = ex.getHttpStatus() != null ? ex.getHttpStatus() : HttpStatus.BAD_REQUEST;
+        ErrorCode errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : ErrorCode.BAD_REQUEST;
 
-    @ExceptionHandler({
-            UnauthorizedBookingOperationException.class,
-            UnauthorizedLocationAccessException.class
-    })
-    public ResponseEntity<ErrorResponse> handleUnauthorizedOperation(RuntimeException ex, HttpServletRequest request) {
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(OffsetDateTime.now())
-                .status(HttpStatus.FORBIDDEN.value())
-                .error(HttpStatus.FORBIDDEN.name())
+                .status(status.value())
+                .error(status.name())
+                .errorCode(errorCode.name())
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-    }
 
-    @ExceptionHandler({
-            DuplicateRoomNameException.class,
-            RoomAlreadyLockedException.class,
-            RoomAlreadyUnlockedException.class,
-            RoomAlreadyInactiveException.class,
-            RoomNotBookableException.class,
-            BookingOverlapException.class,
-            BookingAlreadyCancelledException.class,
-            BookingAlreadyCompletedException.class,
-            DuplicateLocationCodeException.class,
-            DuplicateLocationNameException.class,
-            LocationAlreadyInactiveException.class,
-            LocationNotActiveException.class
-    })
-    public ResponseEntity<ErrorResponse> handleConflictExceptions(RuntimeException ex, HttpServletRequest request) {
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(OffsetDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error(HttpStatus.CONFLICT.name())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        return ResponseEntity.status(status).body(response);
     }
 
     /**
      * Handles database constraint violations specifically inspecting PostgreSQL ServerErrorMessage.
-     * Maps 'no_overlapping_bookings' exclusion constraint to 409 CONFLICT without string pattern matching.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
@@ -114,32 +63,66 @@ public class GlobalExceptionHandler {
                         .timestamp(OffsetDateTime.now())
                         .status(HttpStatus.CONFLICT.value())
                         .error(HttpStatus.CONFLICT.name())
+                        .errorCode(ErrorCode.BOOKING_CONFLICT.name())
                         .message("The room is already booked for the selected time.")
                         .path(request.getRequestURI())
+                        .correlationId(CorrelationContext.get())
+                        .build();
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            if (constraint != null && (constraint.startsWith("ux_") || constraint.endsWith("_key") || constraint.contains("unique"))) {
+                ErrorResponse response = ErrorResponse.builder()
+                        .timestamp(OffsetDateTime.now())
+                        .status(HttpStatus.CONFLICT.value())
+                        .error(HttpStatus.CONFLICT.name())
+                        .errorCode(ErrorCode.DUPLICATE_RESOURCE.name())
+                        .message("A resource with the specified unique field already exists.")
+                        .path(request.getRequestURI())
+                        .correlationId(CorrelationContext.get())
                         .build();
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
         }
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(OffsetDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error(HttpStatus.CONFLICT.name())
-                .message("Data integrity conflict occurred")
-                .path(request.getRequestURI())
-                .build();
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
-    }
-
-    @ExceptionHandler(InvalidBookingTimeException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidBookingTime(InvalidBookingTimeException ex, HttpServletRequest request) {
+        // Deterministic fallback for unknown integrity violations
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.name())
-                .message(ex.getMessage())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
+                .message("Data integrity constraint violation occurred")
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        Map<String, String> errors = new HashMap<>();
+        boolean isTimeZoneError = false;
+
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
+            if ("timezone".equalsIgnoreCase(fieldError.getField()) || (fieldError.getDefaultMessage() != null && fieldError.getDefaultMessage().contains("timezone"))) {
+                isTimeZoneError = true;
+            }
+        }
+
+        String errorCode = isTimeZoneError ? ErrorCode.INVALID_TIMEZONE.name() : ErrorCode.VALIDATION_FAILED.name();
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(errorCode)
+                .message("Validation failed for one or more fields")
+                .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
+                .validationErrors(errors)
+                .build();
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -153,9 +136,12 @@ public class GlobalExceptionHandler {
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
                 .message(message)
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -169,27 +155,57 @@ public class GlobalExceptionHandler {
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
                 .message(message)
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
-        Map<String, String> errors = new HashMap<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
-
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException ex, HttpServletRequest request) {
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.name())
-                .message("Validation failed for one or more fields")
+                .errorCode(ErrorCode.BAD_REQUEST.name())
+                .message(String.format("Required request parameter '%s' is missing", ex.getParameterName()))
                 .path(request.getRequestURI())
-                .validationErrors(errors)
+                .correlationId(CorrelationContext.get())
                 .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPathVariable(MissingPathVariableException ex, HttpServletRequest request) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
+                .message(String.format("Required path variable '%s' is missing", ex.getVariableName()))
+                .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedJson(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
+                .message("Malformed JSON request or invalid field format")
+                .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
+                .build();
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -199,9 +215,12 @@ public class GlobalExceptionHandler {
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.name())
+                .errorCode(ErrorCode.BAD_REQUEST.name())
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -213,13 +232,13 @@ public class GlobalExceptionHandler {
                 .timestamp(OffsetDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error(HttpStatus.INTERNAL_SERVER_ERROR.name())
+                .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.name())
                 .message("An unexpected error occurred")
                 .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
                 .build();
 
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(response);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
     private PSQLException extractPSQLException(Throwable throwable) {

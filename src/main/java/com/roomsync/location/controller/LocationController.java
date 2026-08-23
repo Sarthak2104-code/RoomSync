@@ -12,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ public class LocationController {
     private final LocationService locationService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LocationResponse> createLocation(@Valid @RequestBody CreateLocationRequest request) {
         LocationResponse response = locationService.createLocation(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -48,6 +50,7 @@ public class LocationController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LocationResponse> updateLocation(
             @PathVariable Long id,
             @Valid @RequestBody UpdateLocationRequest request) {
@@ -56,6 +59,7 @@ public class LocationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deactivateLocation(@PathVariable Long id) {
         locationService.deactivateLocation(id);
         return ResponseEntity.noContent().build();

@@ -12,6 +12,7 @@ import com.roomsync.location.repository.LocationRepository;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.security.jwt.JwtTokenProvider;
 import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.repository.RoleRepository;
@@ -62,6 +63,9 @@ class BookingIntegrationTest {
     private BookingRepository bookingRepository;
 
     @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Location location;
@@ -69,6 +73,8 @@ class BookingIntegrationTest {
     private User user2;
     private Room room1;
     private Room lockedRoom;
+    private String user1Token;
+    private String user2Token;
 
     @BeforeEach
     void setUp() {
@@ -115,6 +121,9 @@ class BookingIntegrationTest {
                 .status(RoomStatus.LOCKED)
                 .active(true)
                 .build());
+
+        user1Token = jwtTokenProvider.generateAccessToken(user1.getId(), user1.getEmail(), "USER", location.getId());
+        user2Token = jwtTokenProvider.generateAccessToken(user2.getId(), user2.getEmail(), "USER", location.getId());
     }
 
     @Test
@@ -132,7 +141,7 @@ class BookingIntegrationTest {
                 .build();
 
         String responseStr = mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", user1.getId())
+                        .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
@@ -154,7 +163,7 @@ class BookingIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", user2.getId())
+                        .header("Authorization", "Bearer " + user2Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(overlapRequest)))
                 .andExpect(status().isConflict())
@@ -169,27 +178,27 @@ class BookingIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", user2.getId())
+                        .header("Authorization", "Bearer " + user2Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(adjacentRequest)))
                 .andExpect(status().isCreated());
 
         // 4. Get Booking by Owner -> 200 OK
         mockMvc.perform(get("/api/bookings/" + bookingId)
-                        .header("X-User-Id", user1.getId()))
+                        .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(bookingId))
                 .andExpect(jsonPath("$.reason").value("Quarterly Strategy Alignment"));
 
         // 5. Get Booking by Non-Owner -> 403 FORBIDDEN
         mockMvc.perform(get("/api/bookings/" + bookingId)
-                        .header("X-User-Id", user2.getId()))
+                        .header("Authorization", "Bearer " + user2Token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
 
         // 6. Get My Bookings -> 200 OK
         mockMvc.perform(get("/api/bookings/my")
-                        .header("X-User-Id", user1.getId()))
+                        .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(bookingId));
@@ -203,14 +212,14 @@ class BookingIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/bookings/" + bookingId)
-                        .header("X-User-Id", user1.getId())
+                        .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(rescheduleRequest)))
                 .andExpect(status().isOk());
 
         // 8. Soft Cancel Booking -> 204 NO CONTENT
         mockMvc.perform(delete("/api/bookings/" + bookingId)
-                        .header("X-User-Id", user1.getId()))
+                        .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isNoContent());
 
         // Verify DB row remains with status = CANCELLED
@@ -226,7 +235,7 @@ class BookingIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", user2.getId())
+                        .header("Authorization", "Bearer " + user2Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(rebookRequest)))
                 .andExpect(status().isCreated());
@@ -240,7 +249,7 @@ class BookingIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", user1.getId())
+                        .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(lockedRoomRequest)))
                 .andExpect(status().isConflict())

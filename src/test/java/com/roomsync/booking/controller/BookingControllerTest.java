@@ -14,6 +14,7 @@ import com.roomsync.common.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import static com.roomsync.security.TestSecurityUtils.userAuth;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -36,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BookingController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class BookingControllerTest {
 
@@ -47,43 +50,6 @@ class BookingControllerTest {
 
     @MockitoBean
     private BookingService bookingService;
-
-    @Test
-    @DisplayName("POST /api/bookings - Should return 400 when X-User-Id header is missing")
-    void shouldReturn400WhenHeaderMissing() throws Exception {
-        CreateBookingRequest request = CreateBookingRequest.builder()
-                .roomId(1L)
-                .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
-                .reason("Header Test")
-                .build();
-
-        mockMvc.perform(post("/api/bookings")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("X-User-Id header is required"));
-    }
-
-    @Test
-    @DisplayName("POST /api/bookings - Should return 400 when X-User-Id header is invalid non-numeric")
-    void shouldReturn400WhenHeaderInvalid() throws Exception {
-        CreateBookingRequest request = CreateBookingRequest.builder()
-                .roomId(1L)
-                .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
-                .reason("Header Test")
-                .build();
-
-        mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", "not-a-number")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Invalid X-User-Id header value"));
-    }
 
     @Test
     @DisplayName("POST /api/bookings - Should return 201 when request is valid")
@@ -109,7 +75,7 @@ class BookingControllerTest {
         when(bookingService.createBooking(eq(123L), any(CreateBookingRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", "123")
+                        .with(userAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -134,7 +100,7 @@ class BookingControllerTest {
                 .thenThrow(new BookingOverlapException("The requested time slot overlaps with an existing confirmed booking"));
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", "123")
+                        .with(userAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
@@ -156,7 +122,7 @@ class BookingControllerTest {
         when(bookingService.getBooking(100L, 123L)).thenReturn(response);
 
         mockMvc.perform(get("/api/bookings/100")
-                        .header("X-User-Id", "123"))
+                        .with(userAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(100))
                 .andExpect(jsonPath("$.userId").value(123));
@@ -169,7 +135,7 @@ class BookingControllerTest {
                 .thenThrow(new UnauthorizedBookingOperationException("User is not authorized to access this booking"));
 
         mockMvc.perform(get("/api/bookings/100")
-                        .header("X-User-Id", "456"))
+                        .with(userAuth(456L)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
@@ -182,7 +148,7 @@ class BookingControllerTest {
                 .thenThrow(new BookingNotFoundException(999L));
 
         mockMvc.perform(get("/api/bookings/999")
-                        .header("X-User-Id", "123"))
+                        .with(userAuth(123L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
@@ -212,7 +178,7 @@ class BookingControllerTest {
         when(bookingService.getMyBookings(eq(123L), any(Pageable.class))).thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/bookings/my")
-                        .header("X-User-Id", "123"))
+                        .with(userAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(100))
                 .andExpect(jsonPath("$.totalElements").value(1));
@@ -240,7 +206,7 @@ class BookingControllerTest {
                 .thenReturn(response);
 
         mockMvc.perform(put("/api/bookings/100")
-                        .header("X-User-Id", "123")
+                        .with(userAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -253,7 +219,7 @@ class BookingControllerTest {
         doNothing().when(bookingService).cancelBooking(100L, 123L);
 
         mockMvc.perform(delete("/api/bookings/100")
-                        .header("X-User-Id", "123"))
+                        .with(userAuth(123L)))
                 .andExpect(status().isNoContent());
     }
 }

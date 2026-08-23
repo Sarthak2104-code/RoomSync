@@ -1,7 +1,10 @@
 package com.roomsync.location.exception;
 
-public class DuplicateLocationCodeException extends RuntimeException {
+import com.roomsync.common.exception.ErrorCode;
+import com.roomsync.common.exception.RoomSyncException;
+
+public class DuplicateLocationCodeException extends RoomSyncException {
     public DuplicateLocationCodeException(String code) {
-        super(String.format("A location with the code '%s' already exists", code));
+        super(ErrorCode.DUPLICATE_RESOURCE, String.format("Location with code '%s' already exists", code));
     }
 }

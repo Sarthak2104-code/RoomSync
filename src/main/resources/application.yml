@@ -27,6 +27,13 @@ spring:
     locations: classpath:db/migration
     validate-on-migrate: true
 
+roomsync:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      access-token-expiration-ms: 3600000       # 1 hour
+      refresh-token-expiration-ms: 604800000    # 7 days
+
 logging:
   level:
     root: INFO

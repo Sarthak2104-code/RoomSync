@@ -16,6 +16,7 @@ import com.roomsync.room.service.RoomService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import static com.roomsync.security.TestSecurityUtils.adminAuth;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -39,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(RoomController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class RoomControllerTest {
 
@@ -78,7 +81,7 @@ class RoomControllerTest {
         when(roomService.createRoom(eq(123L), any(CreateRoomRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", "123")
+                        .with(adminAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -100,7 +103,7 @@ class RoomControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", "123")
+                        .with(adminAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -118,7 +121,7 @@ class RoomControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", "123")
+                        .with(adminAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -138,7 +141,7 @@ class RoomControllerTest {
                 .thenThrow(new DuplicateRoomNameException("Taj Mahal", "Mumbai"));
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", "123")
+                        .with(adminAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
@@ -171,7 +174,7 @@ class RoomControllerTest {
         when(roomService.getRooms(eq(123L), any(), any(Pageable.class))).thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/rooms?page=0&size=10&sort=name,asc")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Taj Mahal"))
                 .andExpect(jsonPath("$.totalElements").value(1))
@@ -192,7 +195,7 @@ class RoomControllerTest {
         when(roomService.getRoomById(123L, 1L)).thenReturn(response);
 
         mockMvc.perform(get("/api/rooms/1")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Taj Mahal"));
@@ -204,7 +207,7 @@ class RoomControllerTest {
         when(roomService.getRoomById(123L, 999L)).thenThrow(new RoomNotFoundException(999L));
 
         mockMvc.perform(get("/api/rooms/999")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
@@ -229,7 +232,7 @@ class RoomControllerTest {
         when(roomService.updateRoom(eq(123L), eq(1L), any(UpdateRoomRequest.class))).thenReturn(response);
 
         mockMvc.perform(put("/api/rooms/1")
-                        .header("X-User-Id", "123")
+                        .with(adminAuth(123L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -250,7 +253,7 @@ class RoomControllerTest {
         when(roomService.lockRoom(123L, 1L)).thenReturn(response);
 
         mockMvc.perform(patch("/api/rooms/1/lock")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("LOCKED"));
     }
@@ -261,7 +264,7 @@ class RoomControllerTest {
         when(roomService.lockRoom(123L, 1L)).thenThrow(new RoomAlreadyLockedException(1L));
 
         mockMvc.perform(patch("/api/rooms/1/lock")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("Room with id '1' is already LOCKED"));
@@ -280,7 +283,7 @@ class RoomControllerTest {
         when(roomService.unlockRoom(123L, 1L)).thenReturn(response);
 
         mockMvc.perform(patch("/api/rooms/1/unlock")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
     }
@@ -291,7 +294,7 @@ class RoomControllerTest {
         doNothing().when(roomService).deactivateRoom(123L, 1L);
 
         mockMvc.perform(delete("/api/rooms/1")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isNoContent());
     }
 
@@ -301,7 +304,7 @@ class RoomControllerTest {
         when(roomService.getRoomById(123L, 1L)).thenThrow(new RuntimeException("Sensitive database connection leak info"));
 
         mockMvc.perform(get("/api/rooms/1")
-                        .header("X-User-Id", "123"))
+                        .with(adminAuth(123L)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value(500))
                 .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))

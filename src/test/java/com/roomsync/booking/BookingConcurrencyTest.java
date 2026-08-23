@@ -8,6 +8,7 @@ import com.roomsync.location.repository.LocationRepository;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.security.jwt.JwtTokenProvider;
 import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.repository.RoleRepository;
@@ -67,10 +68,14 @@ class BookingConcurrencyTest {
     private RoomRepository roomRepository;
 
     @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Location location;
     private List<User> users;
+    private List<String> userTokens;
     private Room room1;
     private Room room2;
 
@@ -89,14 +94,17 @@ class BookingConcurrencyTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         users = new ArrayList<>();
+        userTokens = new ArrayList<>();
         for (int i = 1; i <= 15; i++) {
-            users.add(userRepository.save(User.builder()
+            User user = userRepository.save(User.builder()
                     .name("User " + i)
                     .email("user" + i + "@roomsync.com")
                     .password("pass" + i)
                     .role(userRole)
                     .location(location)
-                    .build()));
+                    .build());
+            users.add(user);
+            userTokens.add(jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), "USER", location.getId()));
         }
 
         room1 = roomRepository.save(Room.builder()
@@ -137,12 +145,12 @@ class BookingConcurrencyTest {
 
         List<Future<?>> futures = new ArrayList<>();
         for (int i = 0; i < 2; i++) {
-            final Long userId = users.get(i).getId();
+            final String token = userTokens.get(i);
             futures.add(executor.submit(() -> {
                 try {
                     startGate.await();
                     MvcResult result = mockMvc.perform(post("/api/bookings")
-                                    .header("X-User-Id", userId)
+                                    .header("Authorization", "Bearer " + token)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request)))
                             .andReturn();
@@ -193,7 +201,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(0).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(0))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reqA)))
                         .andReturn().getResponse().getStatus();
@@ -208,7 +216,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(1).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reqB)))
                         .andReturn().getResponse().getStatus();
@@ -251,7 +259,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(0).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(0))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reqA)))
                         .andReturn().getResponse().getStatus();
@@ -265,7 +273,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(1).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reqB)))
                         .andReturn().getResponse().getStatus();
@@ -303,7 +311,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(0).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(0))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req1)))
                         .andReturn().getResponse().getStatus();
@@ -317,7 +325,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", users.get(1).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(req2)))
                         .andReturn().getResponse().getStatus();
@@ -358,12 +366,12 @@ class BookingConcurrencyTest {
 
         List<Future<?>> futures = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
-            final Long userId = users.get(i).getId();
+            final String token = userTokens.get(i);
             futures.add(executor.submit(() -> {
                 try {
                     startGate.await();
                     MvcResult result = mockMvc.perform(post("/api/bookings")
-                                    .header("X-User-Id", userId)
+                                    .header("Authorization", "Bearer " + token)
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(objectMapper.writeValueAsString(request)))
                             .andReturn();
@@ -404,7 +412,7 @@ class BookingConcurrencyTest {
                 .reason("Booking A")
                 .build();
         String respA = mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", users.get(0).getId())
+                        .header("Authorization", "Bearer " + userTokens.get(0))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reqA)))
                 .andExpect(status().isCreated())
@@ -419,7 +427,7 @@ class BookingConcurrencyTest {
                 .reason("Booking B")
                 .build();
         String respB = mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", users.get(1).getId())
+                        .header("Authorization", "Bearer " + userTokens.get(1))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reqB)))
                 .andExpect(status().isCreated())
@@ -447,7 +455,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(put("/api/bookings/" + bookingAId)
-                                .header("X-User-Id", users.get(0).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(0))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reschedA)))
                         .andReturn().getResponse().getStatus();
@@ -462,7 +470,7 @@ class BookingConcurrencyTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(put("/api/bookings/" + bookingBId)
-                                .header("X-User-Id", users.get(1).getId())
+                                .header("Authorization", "Bearer " + userTokens.get(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(reschedB)))
                         .andReturn().getResponse().getStatus();
@@ -497,7 +505,6 @@ class BookingConcurrencyTest {
             java.sql.Timestamp endTs = (java.sql.Timestamp) confirmedBookings.get(i).get("end_time");
             java.sql.Timestamp startNextTs = (java.sql.Timestamp) confirmedBookings.get(i + 1).get("start_time");
 
-            // Adjacent is allowed (endTs.equals(startNextTs)), but endTs must NOT be after startNextTs
             assertThat(endTs.after(startNextTs))
                     .withFailMessage("Found overlapping confirmed bookings: %s and %s", confirmedBookings.get(i), confirmedBookings.get(i + 1))
                     .isFalse();

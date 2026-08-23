@@ -10,6 +10,10 @@ import lombok.Setter;
 import java.time.OffsetDateTime;
 import java.util.Map;
 
+/**
+ * Standard API Error Response structure for RoomSync.
+ * Preserves backward compatibility while providing canonical machine-readable error codes and correlation tracking.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,7 +25,9 @@ public class ErrorResponse {
     private OffsetDateTime timestamp;
     private int status;
     private String error;
+    private String errorCode;
     private String message;
     private String path;
+    private String correlationId;
     private Map<String, String> validationErrors;
 }

@@ -8,6 +8,7 @@ import com.roomsync.room.dto.RoomResponse;
 import com.roomsync.room.dto.UpdateRoomRequest;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.security.jwt.JwtTokenProvider;
 import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.repository.RoleRepository;
@@ -56,10 +57,14 @@ class RoomIntegrationTest {
     private RoleRepository roleRepository;
 
     @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Location location;
     private User adminUser;
+    private String adminToken;
 
     @BeforeEach
     void setUp() {
@@ -82,6 +87,8 @@ class RoomIntegrationTest {
                 .role(adminRole)
                 .location(location)
                 .build());
+
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", location.getId());
     }
 
     @Test
@@ -96,7 +103,7 @@ class RoomIntegrationTest {
                 .build();
 
         String createResponseStr = mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
@@ -112,7 +119,7 @@ class RoomIntegrationTest {
 
         // 2. Reject Duplicate Name in same location (exact case)
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isConflict())
@@ -126,7 +133,7 @@ class RoomIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(lowerCaseRequest)))
                 .andExpect(status().isConflict())
@@ -134,7 +141,7 @@ class RoomIntegrationTest {
 
         // 4. Get Room by ID
         mockMvc.perform(get("/api/rooms/" + roomId)
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(roomId))
                 .andExpect(jsonPath("$.name").value("Taj Mahal"));
@@ -147,7 +154,7 @@ class RoomIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/rooms/" + roomId)
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -156,36 +163,36 @@ class RoomIntegrationTest {
 
         // 6. Lock Room
         mockMvc.perform(patch("/api/rooms/" + roomId + "/lock")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("LOCKED"));
 
         // Locking again should return 409
         mockMvc.perform(patch("/api/rooms/" + roomId + "/lock")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isConflict());
 
         // 7. Unlock Room
         mockMvc.perform(patch("/api/rooms/" + roomId + "/unlock")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
 
         // Unlocking again should return 409
         mockMvc.perform(patch("/api/rooms/" + roomId + "/unlock")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isConflict());
 
         // 8. Paginated Listing
         mockMvc.perform(get("/api/rooms?page=0&size=10&sort=name,asc")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].name").value("Taj Mahal Executive"));
 
         // 9. Soft-Deactivate Room
         mockMvc.perform(delete("/api/rooms/" + roomId)
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
         // Confirm database row still physically exists with active = false
@@ -194,17 +201,17 @@ class RoomIntegrationTest {
 
         // 10. Inactive Room should not be returned by GET /api/rooms or GET /api/rooms/{id}
         mockMvc.perform(get("/api/rooms/" + roomId)
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/rooms")
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
 
         // 11. Deactivating already inactive room should return 409
         mockMvc.perform(delete("/api/rooms/" + roomId)
-                        .header("X-User-Id", adminUser.getId()))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isConflict());
 
         // 12. Inactive room name remains reserved in location
@@ -215,7 +222,7 @@ class RoomIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reCreateInactiveRequest)))
                 .andExpect(status().isConflict())

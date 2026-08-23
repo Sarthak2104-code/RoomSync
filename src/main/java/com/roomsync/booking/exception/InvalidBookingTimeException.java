@@ -1,7 +1,10 @@
 package com.roomsync.booking.exception;
 
-public class InvalidBookingTimeException extends RuntimeException {
+import com.roomsync.common.exception.ErrorCode;
+import com.roomsync.common.exception.RoomSyncException;
+
+public class InvalidBookingTimeException extends RoomSyncException {
     public InvalidBookingTimeException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_TIME, message);
     }
 }

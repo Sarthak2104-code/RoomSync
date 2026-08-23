@@ -1,7 +1,6 @@
 package com.roomsync.location;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.roomsync.booking.dto.BookingResponse;
 import com.roomsync.booking.dto.CreateBookingRequest;
 import com.roomsync.location.dto.CreateLocationRequest;
 import com.roomsync.location.entity.Location;
@@ -10,6 +9,7 @@ import com.roomsync.room.dto.CreateRoomRequest;
 import com.roomsync.room.dto.RoomResponse;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.repository.RoomRepository;
+import com.roomsync.security.jwt.JwtTokenProvider;
 import com.roomsync.user.entity.Role;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.repository.RoleRepository;
@@ -23,7 +23,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +62,9 @@ class MultiLocationAccessIntegrationTest {
     private RoomRepository roomRepository;
 
     @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Location mumbaiLoc;
@@ -70,6 +72,9 @@ class MultiLocationAccessIntegrationTest {
     private User mumbaiUser;
     private User puneUser;
     private User adminUser;
+    private String mumbaiToken;
+    private String puneToken;
+    private String adminToken;
 
     @BeforeEach
     void setUp() {
@@ -106,6 +111,10 @@ class MultiLocationAccessIntegrationTest {
                 .role(adminRole)
                 .location(mumbaiLoc)
                 .build());
+
+        mumbaiToken = jwtTokenProvider.generateAccessToken(mumbaiUser.getId(), mumbaiUser.getEmail(), "USER", mumbaiLoc.getId());
+        puneToken = jwtTokenProvider.generateAccessToken(puneUser.getId(), puneUser.getEmail(), "USER", puneLoc.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", mumbaiLoc.getId());
     }
 
     @Test
@@ -119,7 +128,7 @@ class MultiLocationAccessIntegrationTest {
 
         // 1. Create Boardroom Alpha in Mumbai -> 201 Created
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(mumbaiRoomReq)))
                 .andExpect(status().isCreated())
@@ -134,7 +143,7 @@ class MultiLocationAccessIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(puneRoomReq)))
                 .andExpect(status().isCreated())
@@ -149,7 +158,7 @@ class MultiLocationAccessIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(duplicateMumbaiReq)))
                 .andExpect(status().isConflict())
@@ -159,9 +168,9 @@ class MultiLocationAccessIntegrationTest {
     @Test
     @DisplayName("Cross-Location Authorization: Normal users can only access their own location, Admins access all")
     void testCrossLocationAuthorization() throws Exception {
-        // Create Room in Mumbai
+        // Create Room in Mumbai (by Admin)
         String mumbaiResp = mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", mumbaiUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateRoomRequest.builder()
                                 .locationId(mumbaiLoc.getId())
@@ -172,9 +181,9 @@ class MultiLocationAccessIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         Long mumbaiRoomId = objectMapper.readValue(mumbaiResp, RoomResponse.class).getId();
 
-        // Create Room in Pune
+        // Create Room in Pune (by Admin)
         String puneResp = mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", puneUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateRoomRequest.builder()
                                 .locationId(puneLoc.getId())
@@ -186,29 +195,29 @@ class MultiLocationAccessIntegrationTest {
         Long puneRoomId = objectMapper.readValue(puneResp, RoomResponse.class).getId();
 
         // Mumbai User accesses Mumbai Room -> 200 OK
-        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("X-User-Id", mumbaiUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("Authorization", "Bearer " + mumbaiToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(mumbaiRoomId));
 
         // Mumbai User accesses Pune Room -> 403 Forbidden
-        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("X-User-Id", mumbaiUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("Authorization", "Bearer " + mumbaiToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
 
         // Pune User accesses Pune Room -> 200 OK
-        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("X-User-Id", puneUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("Authorization", "Bearer " + puneToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(puneRoomId));
 
         // Pune User accesses Mumbai Room -> 403 Forbidden
-        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("X-User-Id", puneUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("Authorization", "Bearer " + puneToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
 
         // Admin User accesses Mumbai & Pune Rooms -> 200 OK
-        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("X-User-Id", adminUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + mumbaiRoomId).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("X-User-Id", adminUser.getId()))
+        mockMvc.perform(get("/api/rooms/" + puneRoomId).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
         // Booking Cross-Location Authorization
@@ -217,7 +226,7 @@ class MultiLocationAccessIntegrationTest {
 
         // Alice (Mumbai) books Mumbai Room -> 201 Created
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", mumbaiUser.getId())
+                        .header("Authorization", "Bearer " + mumbaiToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateBookingRequest.builder()
                                 .roomId(mumbaiRoomId)
@@ -229,7 +238,7 @@ class MultiLocationAccessIntegrationTest {
 
         // Alice (Mumbai) attempts to book Pune Room -> 403 Forbidden
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", mumbaiUser.getId())
+                        .header("Authorization", "Bearer " + mumbaiToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateBookingRequest.builder()
                                 .roomId(puneRoomId)
@@ -242,7 +251,7 @@ class MultiLocationAccessIntegrationTest {
 
         // Admin books Pune Room -> 201 Created
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateBookingRequest.builder()
                                 .roomId(puneRoomId)
@@ -256,9 +265,9 @@ class MultiLocationAccessIntegrationTest {
     @Test
     @DisplayName("Location Deactivation: Preserves existing rooms and blocks new room creation and booking")
     void testLocationDeactivationBehavior() throws Exception {
-        // 1. Create Room in Pune
+        // 1. Create Room in Pune (by Admin)
         String puneResp = mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateRoomRequest.builder()
                                 .locationId(puneLoc.getId())
@@ -269,8 +278,9 @@ class MultiLocationAccessIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         Long puneRoomId = objectMapper.readValue(puneResp, RoomResponse.class).getId();
 
-        // 2. Soft-deactivate Pune location
-        mockMvc.perform(delete("/api/locations/" + puneLoc.getId()))
+        // 2. Soft-deactivate Pune location (by Admin)
+        mockMvc.perform(delete("/api/locations/" + puneLoc.getId())
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
         Location deactivatedLoc = locationRepository.findById(puneLoc.getId()).orElseThrow();
@@ -282,7 +292,7 @@ class MultiLocationAccessIntegrationTest {
 
         // 4. Attempt to create new room in deactivated Pune location -> 409 Conflict
         mockMvc.perform(post("/api/rooms")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateRoomRequest.builder()
                                 .locationId(puneLoc.getId())
@@ -297,7 +307,7 @@ class MultiLocationAccessIntegrationTest {
         OffsetDateTime endTime = startTime.plusHours(1);
 
         mockMvc.perform(post("/api/bookings")
-                        .header("X-User-Id", adminUser.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CreateBookingRequest.builder()
                                 .roomId(puneRoomId)
@@ -331,7 +341,7 @@ class MultiLocationAccessIntegrationTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", mumbaiUser.getId())
+                                .header("Authorization", "Bearer " + mumbaiToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(mumReq)))
                         .andReturn().getResponse().getStatus();
@@ -345,7 +355,7 @@ class MultiLocationAccessIntegrationTest {
             try {
                 startGate.await();
                 int status = mockMvc.perform(post("/api/bookings")
-                                .header("X-User-Id", puneUser.getId())
+                                .header("Authorization", "Bearer " + puneToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(punReq)))
                         .andReturn().getResponse().getStatus();

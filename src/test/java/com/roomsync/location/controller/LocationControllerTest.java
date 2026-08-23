@@ -12,6 +12,7 @@ import com.roomsync.location.service.LocationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static com.roomsync.security.TestSecurityUtils.adminAuth;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -33,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(LocationController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class LocationControllerTest {
 
@@ -54,6 +57,7 @@ class LocationControllerTest {
         when(locationService.createLocation(any(CreateLocationRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/locations")
+                        .with(adminAuth(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -71,6 +75,7 @@ class LocationControllerTest {
                 .thenThrow(new DuplicateLocationCodeException("MUM"));
 
         mockMvc.perform(post("/api/locations")
+                        .with(adminAuth(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
@@ -85,7 +90,8 @@ class LocationControllerTest {
 
         when(locationService.getLocationById(1L)).thenReturn(response);
 
-        mockMvc.perform(get("/api/locations/1"))
+        mockMvc.perform(get("/api/locations/1")
+                        .with(adminAuth(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.code").value("MUM"));
@@ -96,7 +102,8 @@ class LocationControllerTest {
     void shouldReturn404WhenLocationNotFound() throws Exception {
         when(locationService.getLocationById(99L)).thenThrow(new LocationNotFoundException(99L));
 
-        mockMvc.perform(get("/api/locations/99"))
+        mockMvc.perform(get("/api/locations/99")
+                        .with(adminAuth(1L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }
@@ -117,7 +124,8 @@ class LocationControllerTest {
 
         when(locationService.getLocations(any(Pageable.class))).thenReturn(pageResponse);
 
-        mockMvc.perform(get("/api/locations"))
+        mockMvc.perform(get("/api/locations")
+                        .with(adminAuth(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Mumbai"));
     }
@@ -131,6 +139,7 @@ class LocationControllerTest {
         when(locationService.updateLocation(eq(1L), any(UpdateLocationRequest.class))).thenReturn(response);
 
         mockMvc.perform(put("/api/locations/1")
+                        .with(adminAuth(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -142,7 +151,8 @@ class LocationControllerTest {
     void shouldDeactivateLocation() throws Exception {
         doNothing().when(locationService).deactivateLocation(1L);
 
-        mockMvc.perform(delete("/api/locations/1"))
+        mockMvc.perform(delete("/api/locations/1")
+                        .with(adminAuth(1L)))
                 .andExpect(status().isNoContent());
     }
 }
