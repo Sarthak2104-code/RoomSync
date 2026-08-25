@@ -12,6 +12,7 @@ import com.roomsync.room.dto.UpdateRoomRequest;
 import com.roomsync.room.entity.Room;
 import com.roomsync.room.entity.RoomStatus;
 import com.roomsync.room.exception.DuplicateRoomNameException;
+import com.roomsync.room.exception.RoomAlreadyActiveException;
 import com.roomsync.room.exception.RoomAlreadyInactiveException;
 import com.roomsync.room.exception.RoomAlreadyLockedException;
 import com.roomsync.room.exception.RoomAlreadyUnlockedException;
@@ -195,6 +196,28 @@ public class RoomService {
         room.setStatus(RoomStatus.AVAILABLE);
         Room updatedRoom = roomRepository.save(room);
         log.info("Unlocked room with id: {}", updatedRoom.getId());
+        return RoomResponse.fromEntity(updatedRoom);
+    }
+
+    @Transactional
+    public RoomResponse activateRoom(Long userId, Long id) {
+        User caller = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        Room room = roomRepository.findById(id)
+                .orElseThrow(() -> new RoomNotFoundException(id));
+
+        if (caller.getRoleEnum() == UserRole.USER && !room.getLocation().getId().equals(caller.getLocation().getId())) {
+            throw new UnauthorizedLocationAccessException("User is not authorized to activate rooms in another location");
+        }
+
+        if (room.isActive()) {
+            throw new RoomAlreadyActiveException(id);
+        }
+
+        room.setActive(true);
+        Room updatedRoom = roomRepository.save(room);
+        log.info("Activated room with id: {}", id);
         return RoomResponse.fromEntity(updatedRoom);
     }
 

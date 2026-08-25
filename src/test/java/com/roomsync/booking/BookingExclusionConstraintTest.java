@@ -23,12 +23,15 @@ import java.time.OffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.springframework.test.context.ActiveProfiles;
+
 /**
  * Category C: Direct Database Constraint Tests
  * Verifies that PostgreSQL's 'no_overlapping_bookings' exclusion constraint
  * independently rejects overlapping CONFIRMED bookings even when bypassing application logic.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class BookingExclusionConstraintTest {
 
     @Autowired

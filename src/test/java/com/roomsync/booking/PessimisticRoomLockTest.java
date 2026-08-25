@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.springframework.test.context.ActiveProfiles;
+
 /**
  * Category A: Dedicated Pessimistic Lock Test
  * Proves that:
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * -> Transaction B acquires lock and finishes
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class PessimisticRoomLockTest {
 
     @Autowired

@@ -30,6 +30,8 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             @Param("id") Long id
     );
 
+    Page<Room> findAllByLocationId(Long locationId, Pageable pageable);
+
     Page<Room> findAllByLocationIdAndActiveTrue(Long locationId, Pageable pageable);
 
     Page<Room> findAllByActiveTrue(Pageable pageable);

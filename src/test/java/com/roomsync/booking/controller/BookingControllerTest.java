@@ -32,6 +32,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -213,13 +214,59 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.id").value(100));
     }
 
+
+    @Test
+    @DisplayName("PATCH /api/bookings/{id}/reschedule - Should return 200 on successful reschedule")
+    void shouldRescheduleBookingViaPatch() throws Exception {
+        RescheduleBookingRequest request = RescheduleBookingRequest.builder()
+                .startTime(OffsetDateTime.parse("2026-08-20T14:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-08-20T15:00:00Z"))
+                .build();
+
+        BookingResponse response = BookingResponse.builder()
+                .id(100L)
+                .roomId(1L)
+                .userId(123L)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .reason("Rescheduled Meeting")
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingService.rescheduleBooking(eq(100L), eq(123L), any(RescheduleBookingRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(patch("/api/bookings/100/reschedule")
+                        .with(userAuth(123L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(100));
+    }
+
     @Test
     @DisplayName("DELETE /api/bookings/{id} - Should return 204 on cancellation")
     void shouldCancelBooking() throws Exception {
-        doNothing().when(bookingService).cancelBooking(100L, 123L);
+        doNothing().when(bookingService).cancelBooking(eq(100L), eq(123L), any());
 
         mockMvc.perform(delete("/api/bookings/100")
                         .with(userAuth(123L)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/bookings/{id} - Should return 204 with cancel reason body")
+    void shouldCancelBookingWithReasonBody() throws Exception {
+        com.roomsync.booking.dto.CancelBookingRequest request = com.roomsync.booking.dto.CancelBookingRequest.builder()
+                .reason("Meeting cancelled by client")
+                .build();
+
+        doNothing().when(bookingService).cancelBooking(eq(100L), eq(123L), eq("Meeting cancelled by client"));
+
+        mockMvc.perform(delete("/api/bookings/100")
+                        .with(userAuth(123L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent());
     }
 }

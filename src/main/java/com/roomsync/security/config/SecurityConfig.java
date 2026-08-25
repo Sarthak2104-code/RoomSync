@@ -63,14 +63,14 @@ public class SecurityConfig {
                         // Public authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // Room & Location read endpoints accessible by all authenticated users
-                        .requestMatchers(HttpMethod.GET, "/api/rooms/**", "/api/locations/**").authenticated()
+                        // Room, Location & Amenity read endpoints accessible by all authenticated users
+                        .requestMatchers(HttpMethod.GET, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").authenticated()
 
-                        // Room & Location mutation endpoints restricted to ADMIN
-                        .requestMatchers(HttpMethod.POST, "/api/rooms/**", "/api/locations/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/rooms/**", "/api/locations/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/rooms/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/rooms/**", "/api/locations/**").hasRole("ADMIN")
+                        // Room, Location & Amenity mutation endpoints restricted to ADMIN
+                        .requestMatchers(HttpMethod.POST, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").hasRole("ADMIN")
 
                         // Dedicated Admin endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

@@ -14,6 +14,10 @@ import com.roomsync.booking.exception.RoomNotBookableException;
 import com.roomsync.booking.exception.UnauthorizedBookingOperationException;
 import com.roomsync.booking.repository.BookingRepository;
 import com.roomsync.common.response.PageResponse;
+import com.roomsync.common.time.DateTimeProvider;
+import com.roomsync.common.time.SystemDateTimeProvider;
+import com.roomsync.common.time.TimeService;
+import com.roomsync.common.time.TimezoneService;
 import com.roomsync.location.entity.Location;
 import com.roomsync.location.exception.UnauthorizedLocationAccessException;
 import com.roomsync.room.entity.Room;
@@ -63,6 +67,18 @@ class BookingServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private BookingConcurrencyService bookingConcurrencyService;
+
+    @Mock
+    private com.roomsync.audit.service.AuditService auditService;
+
+    @Mock
+    private com.roomsync.notification.service.NotificationOutboxService notificationOutboxService;
+
+    @Mock
+    private com.roomsync.booking.service.BookingCompletionService bookingCompletionService;
+
     // Fixed clock at 2026-08-20T09:00:00Z
     private final Clock clock = Clock.fixed(Instant.parse("2026-08-20T09:00:00Z"), ZoneOffset.UTC);
 
@@ -79,7 +95,10 @@ class BookingServiceTest {
 
     @BeforeEach
     void setUp() {
-        bookingService = new BookingService(bookingRepository, roomRepository, userRepository, clock);
+        DateTimeProvider dateTimeProvider = new SystemDateTimeProvider(clock);
+        TimezoneService timezoneService = new TimezoneService(dateTimeProvider);
+        TimeService timeService = new TimeService(timezoneService, dateTimeProvider);
+        bookingService = new BookingService(bookingRepository, roomRepository, userRepository, timeService, timezoneService, bookingConcurrencyService, auditService, notificationOutboxService, bookingCompletionService, clock);
 
         userRole = Role.builder().id(1L).name("USER").build();
 
@@ -459,7 +478,7 @@ class BookingServiceTest {
     class RescheduleBookingTests {
 
         @Test
-        @DisplayName("Should successfully reschedule booking when valid and no overlap with others")
+        @DisplayName("Should successfully reschedule booking by cancelling original and creating replacement")
         void shouldRescheduleSuccessfully() {
             Booking booking = Booking.builder()
                     .id(100L)
@@ -481,13 +500,58 @@ class BookingServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
             when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
             when(roomRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(activeAvailableRoom));
-            when(bookingRepository.existsOverlappingBookingExcludingBooking(10L, 100L, newStart, newEnd)).thenReturn(false);
-            when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+            when(bookingRepository.existsOverlappingBooking(10L, newStart, newEnd)).thenReturn(false);
+            when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
+                Booking b = i.getArgument(0);
+                if (b.getId() == null) {
+                    b.setId(200L);
+                }
+                return b;
+            });
 
             BookingResponse response = bookingService.rescheduleBooking(100L, 1L, request);
 
+            // Original booking is cancelled with reason RESCHEDULED
+            assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+            assertThat(booking.getCancelledReason()).isEqualTo("RESCHEDULED");
+            assertThat(booking.getStartTime()).isEqualTo(OffsetDateTime.parse("2026-08-20T10:00:00Z"));
+            assertThat(booking.getEndTime()).isEqualTo(OffsetDateTime.parse("2026-08-20T11:00:00Z"));
+
+            // Replacement booking response
+            assertThat(response.getId()).isEqualTo(200L);
             assertThat(response.getStartTime()).isEqualTo(newStart);
             assertThat(response.getEndTime()).isEqualTo(newEnd);
+            assertThat(response.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+            assertThat(response.getRescheduledFromId()).isEqualTo(100L);
+        }
+
+        @Test
+        @DisplayName("Should throw BookingOverlapException when replacement slot overlaps")
+        void shouldThrowWhenReplacementOverlaps() {
+            Booking booking = Booking.builder()
+                    .id(100L)
+                    .user(user1)
+                    .room(activeAvailableRoom)
+                    .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
+                    .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
+                    .status(BookingStatus.CONFIRMED)
+                    .build();
+
+            OffsetDateTime newStart = OffsetDateTime.parse("2026-08-20T14:00:00Z");
+            OffsetDateTime newEnd = OffsetDateTime.parse("2026-08-20T15:00:00Z");
+            RescheduleBookingRequest request = RescheduleBookingRequest.builder()
+                    .startTime(newStart)
+                    .endTime(newEnd)
+                    .build();
+
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+            when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+            when(roomRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(activeAvailableRoom));
+            when(bookingRepository.existsOverlappingBooking(10L, newStart, newEnd)).thenReturn(true);
+
+            assertThatThrownBy(() -> bookingService.rescheduleBooking(100L, 1L, request))
+                    .isInstanceOf(com.roomsync.booking.exception.BookingOverlapException.class);
         }
     }
 
@@ -496,8 +560,8 @@ class BookingServiceTest {
     class CancelBookingTests {
 
         @Test
-        @DisplayName("Should soft-cancel confirmed booking")
-        void shouldCancelConfirmedBooking() {
+        @DisplayName("Should soft-cancel confirmed booking with custom reason")
+        void shouldCancelConfirmedBookingWithReason() {
             Booking booking = Booking.builder()
                     .id(100L)
                     .user(user1)
@@ -512,10 +576,87 @@ class BookingServiceTest {
             when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
             when(roomRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(activeAvailableRoom));
 
-            bookingService.cancelBooking(100L, 1L);
+            bookingService.cancelBooking(100L, 1L, "Client rescheduled meeting");
 
             assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+            assertThat(booking.getCancelledReason()).isEqualTo("Client rescheduled meeting");
             verify(bookingRepository).save(booking);
+        }
+
+        @Test
+        @DisplayName("Should reject cancelling already cancelled booking")
+        void shouldRejectAlreadyCancelled() {
+            Booking booking = Booking.builder()
+                    .id(100L)
+                    .user(user1)
+                    .room(activeAvailableRoom)
+                    .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
+                    .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
+                    .status(BookingStatus.CANCELLED)
+                    .build();
+
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+            when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+
+            assertThatThrownBy(() -> bookingService.cancelBooking(100L, 1L))
+                    .isInstanceOf(com.roomsync.booking.exception.BookingAlreadyCancelledException.class);
+        }
+
+        @Test
+        @DisplayName("Should reject cancelling completed booking")
+        void shouldRejectCompletedBooking() {
+            Booking booking = Booking.builder()
+                    .id(100L)
+                    .user(user1)
+                    .room(activeAvailableRoom)
+                    .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
+                    .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
+                    .status(BookingStatus.COMPLETED)
+                    .build();
+
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+            when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+
+            assertThatThrownBy(() -> bookingService.cancelBooking(100L, 1L))
+                    .isInstanceOf(com.roomsync.booking.exception.BookingAlreadyCompletedException.class);
+        }
+
+        @Test
+        @DisplayName("Should reject non-owner cancellation")
+        void shouldRejectNonOwnerCancellation() {
+            Booking booking = Booking.builder()
+                    .id(100L)
+                    .user(user1)
+                    .room(activeAvailableRoom)
+                    .startTime(OffsetDateTime.parse("2026-08-20T10:00:00Z"))
+                    .endTime(OffsetDateTime.parse("2026-08-20T11:00:00Z"))
+                    .reason("Sprint Planning")
+                    .status(BookingStatus.CONFIRMED)
+                    .build();
+
+            when(userRepository.findById(2L)).thenReturn(Optional.of(user2));
+            when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+
+            assertThatThrownBy(() -> bookingService.cancelBooking(100L, 2L))
+                    .isInstanceOf(UnauthorizedBookingOperationException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("completePastBookings tests")
+    class CompletePastBookingsTests {
+
+        @Test
+        @DisplayName("Should invoke bulk update for past confirmed bookings")
+        void shouldCompletePastBookings() {
+            when(bookingRepository.completePastConfirmedBookings(any(OffsetDateTime.class))).thenReturn(5);
+
+            int completedCount = bookingService.completePastBookings();
+
+            assertThat(completedCount).isEqualTo(5);
+            verify(bookingRepository).completePastConfirmedBookings(any(OffsetDateTime.class));
         }
     }
 }

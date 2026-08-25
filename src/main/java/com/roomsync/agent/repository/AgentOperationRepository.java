@@ -12,6 +12,7 @@ import java.util.Optional;
 
 @Repository
 public interface AgentOperationRepository extends JpaRepository<AgentOperation, Long> {
+    Optional<AgentOperation> findByOperationId(String operationId);
     Page<AgentOperation> findAllByActingUserId(Long actingUserId, Pageable pageable);
     List<AgentOperation> findAllByStatus(AgentOperationStatus status);
     Optional<AgentOperation> findByIdempotencyKey(String idempotencyKey);

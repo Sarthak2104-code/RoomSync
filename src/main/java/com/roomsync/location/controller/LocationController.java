@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -56,6 +57,20 @@ public class LocationController {
             @Valid @RequestBody UpdateLocationRequest request) {
         LocationResponse response = locationService.updateLocation(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<LocationResponse> activateLocation(@PathVariable Long id) {
+        LocationResponse response = locationService.activateLocation(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> patchDeactivateLocation(@PathVariable Long id) {
+        locationService.deactivateLocation(id);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")

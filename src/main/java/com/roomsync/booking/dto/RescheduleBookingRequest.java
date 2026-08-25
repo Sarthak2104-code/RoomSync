@@ -16,6 +16,8 @@ import java.time.OffsetDateTime;
 @Builder
 public class RescheduleBookingRequest {
 
+    private Long roomId;
+
     @NotNull(message = "Start time is required")
     private OffsetDateTime startTime;
 

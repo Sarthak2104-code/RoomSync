@@ -7,6 +7,7 @@ import com.roomsync.location.dto.UpdateLocationRequest;
 import com.roomsync.location.entity.Location;
 import com.roomsync.location.exception.DuplicateLocationCodeException;
 import com.roomsync.location.exception.DuplicateLocationNameException;
+import com.roomsync.location.exception.LocationAlreadyActiveException;
 import com.roomsync.location.exception.LocationAlreadyInactiveException;
 import com.roomsync.location.exception.LocationNotFoundException;
 import com.roomsync.location.repository.LocationRepository;
@@ -92,6 +93,21 @@ public class LocationService {
 
         Location updated = locationRepository.save(location);
         log.info("Updated location id: {} with code: '{}'", updated.getId(), updated.getCode());
+        return LocationResponse.fromEntity(updated);
+    }
+
+    @Transactional
+    public LocationResponse activateLocation(Long id) {
+        Location location = locationRepository.findById(id)
+                .orElseThrow(() -> new LocationNotFoundException(id));
+
+        if (location.isActive()) {
+            throw new LocationAlreadyActiveException(id);
+        }
+
+        location.setActive(true);
+        Location updated = locationRepository.save(location);
+        log.info("Activated location id: {}", id);
         return LocationResponse.fromEntity(updated);
     }
 

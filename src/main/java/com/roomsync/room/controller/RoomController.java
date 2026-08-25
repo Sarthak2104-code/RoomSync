@@ -102,6 +102,26 @@ public class RoomController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomResponse> activateRoom(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @PathVariable Long id) {
+        AuthenticatedUser user = resolveUser(currentUser);
+        RoomResponse response = roomService.activateRoom(user.id(), id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> patchDeactivateRoom(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @PathVariable Long id) {
+        AuthenticatedUser user = resolveUser(currentUser);
+        roomService.deactivateRoom(user.id(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deactivateRoom(

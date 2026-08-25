@@ -28,7 +28,7 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 
 /**
- * AgentOperation Entity representing high-level, multi-step asynchronous AI agent workflows.
+ * AgentOperation Entity representing durable operations initiated by users or AI agents.
  */
 @Entity
 @Table(name = "agent_operations")
@@ -44,6 +44,10 @@ public class AgentOperation {
     private Long id;
 
     @NotBlank
+    @Column(name = "operation_id", nullable = false, unique = true, length = 255)
+    private String operationId;
+
+    @NotBlank
     @Column(name = "operation_type", nullable = false, length = 100)
     private String operationType;
 
@@ -56,6 +60,25 @@ public class AgentOperation {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private AgentOperationStatus status;
+
+    @Column(name = "resource_type", length = 100)
+    private String resourceType;
+
+    @Column(name = "resource_id", length = 255)
+    private String resourceId;
+
+    @Column(name = "request_hash", length = 255)
+    private String requestHash;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "result_payload", columnDefinition = "jsonb")
+    private Map<String, Object> resultPayload;
+
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @Column(name = "correlation_id", length = 255)
+    private String correlationId;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "draft_payload", columnDefinition = "jsonb")

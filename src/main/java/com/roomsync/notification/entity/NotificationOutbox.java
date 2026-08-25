@@ -43,6 +43,10 @@ public class NotificationOutbox {
     private Long id;
 
     @NotBlank
+    @Column(name = "event_id", nullable = false, unique = true, length = 255)
+    private String eventId;
+
+    @NotBlank
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
@@ -88,4 +92,11 @@ public class NotificationOutbox {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operation_id")
     private AgentOperation operation;
+
+    @jakarta.persistence.PrePersist
+    public void prePersist() {
+        if (this.eventId == null || this.eventId.trim().isEmpty()) {
+            this.eventId = "evt_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        }
+    }
 }

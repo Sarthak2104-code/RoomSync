@@ -36,9 +36,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class BookingIntegrationTest {
 
     @Autowired
@@ -203,7 +205,7 @@ class BookingIntegrationTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(bookingId));
 
-        // 7. Reschedule Booking (Move to 14:00 - 15:00)
+        // 7. Reschedule Booking (Move to 14:00 - 15:00) -> creates replacement, cancels original
         OffsetDateTime rescheduleStart = slot1Start.withHour(14);
         OffsetDateTime rescheduleEnd = slot1Start.withHour(15);
         RescheduleBookingRequest rescheduleRequest = RescheduleBookingRequest.builder()
@@ -211,20 +213,32 @@ class BookingIntegrationTest {
                 .endTime(rescheduleEnd)
                 .build();
 
-        mockMvc.perform(put("/api/bookings/" + bookingId)
+        String rescheduleRespStr = mockMvc.perform(put("/api/bookings/" + bookingId)
                         .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(rescheduleRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.rescheduledFromId").value(bookingId))
+                .andReturn().getResponse().getContentAsString();
 
-        // 8. Soft Cancel Booking -> 204 NO CONTENT
-        mockMvc.perform(delete("/api/bookings/" + bookingId)
+        BookingResponse replacementBooking = objectMapper.readValue(rescheduleRespStr, BookingResponse.class);
+        Long replacementBookingId = replacementBooking.getId();
+
+        // Verify original booking is now CANCELLED with reason "RESCHEDULED"
+        Booking originalBooking = bookingRepository.findById(bookingId).orElseThrow();
+        assertThat(originalBooking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(originalBooking.getCancelledReason()).isEqualTo("RESCHEDULED");
+
+        // 8. Soft Cancel Replacement Booking -> 204 NO CONTENT
+        mockMvc.perform(delete("/api/bookings/" + replacementBookingId)
                         .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isNoContent());
 
-        // Verify DB row remains with status = CANCELLED
-        Booking cancelledDbBooking = bookingRepository.findById(bookingId).orElseThrow();
-        assertThat(cancelledDbBooking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        // Verify replacement DB row remains with status = CANCELLED
+        Booking cancelledReplacement = bookingRepository.findById(replacementBookingId).orElseThrow();
+        assertThat(cancelledReplacement.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(cancelledReplacement.getCancelledReason()).isEqualTo("Cancelled by user");
 
         // 9. Re-booking the old slot is now allowed because previous booking is CANCELLED
         CreateBookingRequest rebookRequest = CreateBookingRequest.builder()

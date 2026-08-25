@@ -51,12 +51,15 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.springframework.test.context.ActiveProfiles;
+
 /**
  * Verification Test Suite for Task 2: Core Data Model & Database Migrations.
  * Rigorously validates all new database tables, constraints, JSONB mapping,
  * relationships, case-insensitivity, XOR bounds, and delete restrict rules.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class DataModelConstraintTest {
 
     @Autowired

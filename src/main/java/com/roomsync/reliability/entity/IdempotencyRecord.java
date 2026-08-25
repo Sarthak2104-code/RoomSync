@@ -19,8 +19,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 
 /**
  * IdempotencyRecord Entity enforcing unique request executions scoped per user.
@@ -65,6 +68,10 @@ public class IdempotencyRecord {
 
     @Column(name = "response_reference")
     private String responseReference;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "response_payload", columnDefinition = "jsonb")
+    private Map<String, Object> responsePayload;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
