@@ -37,6 +37,9 @@ export const AppLayout: React.FC = () => {
                 <NavLink to="/locations" className={navLinkClass}>
                   Locations
                 </NavLink>
+                <NavLink to="/my-bookings" className={navLinkClass}>
+                  My Bookings
+                </NavLink>
               </nav>
             </div>
 

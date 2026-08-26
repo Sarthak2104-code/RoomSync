@@ -260,8 +260,13 @@ export const BookingFormPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/rooms">
+            <Link to="/my-bookings">
               <Button variant="primary" className="w-full sm:w-auto">
+                View My Bookings &rarr;
+              </Button>
+            </Link>
+            <Link to="/rooms">
+              <Button variant="outline" className="w-full sm:w-auto">
                 Return to Rooms
               </Button>
             </Link>

@@ -9,6 +9,12 @@ export interface CreateBookingPayload {
   timezone?: string
 }
 
+export interface RescheduleBookingPayload {
+  roomId?: number
+  startTime: string
+  endTime: string
+}
+
 export interface BookingResponse {
   id: number
   roomId: number

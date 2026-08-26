@@ -7,6 +7,8 @@ import LocationListPage from '@/rooms/LocationListPage'
 import RoomSearchPage from '@/rooms/RoomSearchPage'
 import RoomDetailsPage from '@/rooms/RoomDetailsPage'
 import BookingFormPage from '@/bookings/BookingFormPage'
+import MyBookingsPage from '@/bookings/MyBookingsPage'
+import RescheduleBookingPage from '@/bookings/RescheduleBookingPage'
 import AdminPlaceholderPage from '@/auth/AdminPlaceholderPage'
 
 export const router = createBrowserRouter([
@@ -36,6 +38,14 @@ export const router = createBrowserRouter([
       {
         path: '/locations',
         element: <LocationListPage />,
+      },
+      {
+        path: '/my-bookings',
+        element: <MyBookingsPage />,
+      },
+      {
+        path: '/bookings/:id/reschedule',
+        element: <RescheduleBookingPage />,
       },
       {
         path: '/user',
