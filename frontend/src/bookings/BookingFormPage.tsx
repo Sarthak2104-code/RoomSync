@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { roomService } from '@/api/roomService'
 import { bookingService } from '@/api/bookingService'
 import type { RoomResponse } from '@/types/room'
-import type { BookingResponse } from '@/types/booking'
+import type { BookingResponse, BookingDraft } from '@/types/booking'
 import type { BackendError } from '@/types/api'
 import {
   Badge,
@@ -15,6 +15,38 @@ import {
   TimePicker,
   toast,
 } from '@/components'
+
+const DRAFT_KEY_PREFIX = 'roomsync:booking-draft:'
+
+function getBookingDraft(roomId: number): BookingDraft | null {
+  try {
+    const raw = sessionStorage.getItem(`${DRAFT_KEY_PREFIX}${roomId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as BookingDraft
+    if (parsed && parsed.roomId === roomId && parsed.localDate && parsed.startTime && parsed.endTime) {
+      return parsed
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function saveBookingDraft(draft: BookingDraft): void {
+  try {
+    sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${draft.roomId}`, JSON.stringify(draft))
+  } catch (e) {
+    console.warn('Failed to save booking draft to sessionStorage', e)
+  }
+}
+
+function clearBookingDraft(roomId: number): void {
+  try {
+    sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${roomId}`)
+  } catch (e) {
+    console.warn('Failed to remove booking draft from sessionStorage', e)
+  }
+}
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -39,18 +71,45 @@ function isValid15MinuteBoundary(timeStr: string): boolean {
 export const BookingFormPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const idNum = roomId ? Number(roomId) : null
+
+  const isReviewRoute = location.pathname.endsWith('/review')
 
   // Room state
   const [room, setRoom] = useState<RoomResponse | null>(null)
   const [isRoomLoading, setIsRoomLoading] = useState<boolean>(true)
   const [roomError, setRoomError] = useState<BackendError | null>(null)
 
-  // Form values
-  const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0])
-  const [startTime, setStartTime] = useState<string>('10:00')
-  const [endTime, setEndTime] = useState<string>('11:00')
-  const [reason, setReason] = useState<string>('')
+  // Form values prefilled from draft if available
+  const [date, setDate] = useState<string>(() => {
+    if (idNum) {
+      const draft = getBookingDraft(idNum)
+      if (draft) return draft.localDate
+    }
+    return new Date().toISOString().split('T')[0]
+  })
+  const [startTime, setStartTime] = useState<string>(() => {
+    if (idNum) {
+      const draft = getBookingDraft(idNum)
+      if (draft) return draft.startTime
+    }
+    return '10:00'
+  })
+  const [endTime, setEndTime] = useState<string>(() => {
+    if (idNum) {
+      const draft = getBookingDraft(idNum)
+      if (draft) return draft.endTime
+    }
+    return '11:00'
+  })
+  const [reason, setReason] = useState<string>(() => {
+    if (idNum) {
+      const draft = getBookingDraft(idNum)
+      if (draft) return draft.reason
+    }
+    return ''
+  })
 
   // Validation errors
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
@@ -83,6 +142,20 @@ export const BookingFormPage: React.FC = () => {
   useEffect(() => {
     loadRoom()
   }, [loadRoom])
+
+  // Sync state from draft or redirect if accessing /review without a draft
+  useEffect(() => {
+    if (!idNum) return
+    const draft = getBookingDraft(idNum)
+    if (draft) {
+      setDate(draft.localDate)
+      setStartTime(draft.startTime)
+      setEndTime(draft.endTime)
+      setReason(draft.reason)
+    } else if (isReviewRoute && step !== 'success') {
+      navigate(`/rooms/${idNum}/book`, { replace: true })
+    }
+  }, [idNum, isReviewRoute, step, navigate])
 
   // Validate form inputs
   const validateForm = (): boolean => {
@@ -129,10 +202,35 @@ export const BookingFormPage: React.FC = () => {
   // Proceed from Form to Review
   const handleProceedToReview = (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
+    if (validateForm() && idNum) {
+      saveBookingDraft({
+        roomId: idNum,
+        localDate: date,
+        startTime,
+        endTime,
+        timezone: 'Asia/Kolkata',
+        reason: reason.trim(),
+        updatedAt: Date.now(),
+      })
       setMutationError(null)
-      setStep('review')
+      navigate(`/rooms/${idNum}/book/review`)
     }
+  }
+
+  // Return to Form to edit details while preserving draft
+  const handleEditDetails = () => {
+    if (idNum) {
+      saveBookingDraft({
+        roomId: idNum,
+        localDate: date,
+        startTime,
+        endTime,
+        timezone: 'Asia/Kolkata',
+        reason: reason.trim(),
+        updatedAt: Date.now(),
+      })
+    }
+    navigate(`/rooms/${idNum}/book`)
   }
 
   // Submit booking mutation
@@ -168,6 +266,7 @@ export const BookingFormPage: React.FC = () => {
         idempotencyKeyRef.current,
       )
 
+      clearBookingDraft(room.id)
       setConfirmedBooking(response)
       setStep('success')
       setIsConfirmOpen(false)
@@ -277,13 +376,13 @@ export const BookingFormPage: React.FC = () => {
   }
 
   // REVIEW STEP VIEW
-  if (step === 'review') {
+  if (isReviewRoute) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
         <div>
           <button
             type="button"
-            onClick={() => setStep('form')}
+            onClick={handleEditDetails}
             className="inline-flex items-center gap-1 text-sm font-medium text-brand-navy hover:text-brand-accent cursor-pointer"
           >
             &larr; Back to Edit Details
@@ -353,7 +452,7 @@ export const BookingFormPage: React.FC = () => {
           <div className="flex justify-end gap-3 pt-4 border-t border-brand-slate/10">
             <Button
               variant="outline"
-              onClick={() => setStep('form')}
+              onClick={handleEditDetails}
               disabled={isSubmitting}
             >
               Edit Details

@@ -74,6 +74,12 @@ class RecurringBookingServiceTest {
     private BookingRepository bookingRepository;
 
     @Mock
+    private com.roomsync.booking.repository.BookingOccurrenceExceptionRepository bookingOccurrenceExceptionRepository;
+
+    @Mock
+    private com.roomsync.audit.service.AuditService auditService;
+
+    @Mock
     private AdminRequestRepository adminRequestRepository;
 
     @Mock

@@ -9,6 +9,7 @@ import RoomDetailsPage from '@/rooms/RoomDetailsPage'
 import BookingFormPage from '@/bookings/BookingFormPage'
 import MyBookingsPage from '@/bookings/MyBookingsPage'
 import RescheduleBookingPage from '@/bookings/RescheduleBookingPage'
+import RecurringBookingPage from '@/recurring/RecurringBookingPage'
 import AdminPlaceholderPage from '@/auth/AdminPlaceholderPage'
 
 export const router = createBrowserRouter([
@@ -36,6 +37,18 @@ export const router = createBrowserRouter([
         element: <BookingFormPage />,
       },
       {
+        path: '/rooms/:roomId/book/review',
+        element: <BookingFormPage />,
+      },
+      {
+        path: '/rooms/:roomId/recurring',
+        element: <RecurringBookingPage />,
+      },
+      {
+        path: '/rooms/:roomId/recurring/:seriesId',
+        element: <RecurringBookingPage />,
+      },
+      {
         path: '/locations',
         element: <LocationListPage />,
       },
@@ -46,6 +59,18 @@ export const router = createBrowserRouter([
       {
         path: '/bookings/:id/reschedule',
         element: <RescheduleBookingPage />,
+      },
+      {
+        path: '/bookings/recurring',
+        element: <RecurringBookingPage />,
+      },
+      {
+        path: '/bookings/recurring/:seriesId',
+        element: <RecurringBookingPage />,
+      },
+      {
+        path: '/recurring/:seriesId',
+        element: <RecurringBookingPage />,
       },
       {
         path: '/user',

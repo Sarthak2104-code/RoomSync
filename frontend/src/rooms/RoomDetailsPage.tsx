@@ -110,11 +110,18 @@ export const RoomDetailsPage: React.FC = () => {
               Refresh Status
             </Button>
             {room.status === 'AVAILABLE' && room.active && (
-              <Link to={`/rooms/${room.id}/book`}>
-                <Button variant="primary" size="sm">
-                  Book this Room &rarr;
-                </Button>
-              </Link>
+              <>
+                <Link to={`/rooms/${room.id}/recurring`}>
+                  <Button variant="outline" size="sm">
+                    Book Recurring
+                  </Button>
+                </Link>
+                <Link to={`/rooms/${room.id}/book`}>
+                  <Button variant="primary" size="sm">
+                    Book this Room &rarr;
+                  </Button>
+                </Link>
+              </>
             )}
           </div>
         </div>

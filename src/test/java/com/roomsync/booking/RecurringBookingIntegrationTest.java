@@ -84,6 +84,12 @@ class RecurringBookingIntegrationTest {
     private BookingSeriesRepository bookingSeriesRepository;
 
     @Autowired
+    private com.roomsync.booking.repository.BookingOccurrenceExceptionRepository bookingOccurrenceExceptionRepository;
+
+    @Autowired
+    private com.roomsync.audit.repository.AuditLogRepository auditLogRepository;
+
+    @Autowired
     private AdminRequestRepository adminRequestRepository;
 
     @Autowired
@@ -495,4 +501,91 @@ class RecurringBookingIntegrationTest {
         assertThat(bookingRepository.count()).isEqualTo(0);
         assertThat(bookingSeriesRepository.count()).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("Skip Unresolved Conflict: Persistent skip marks occurrence as SKIPPED and updates series status")
+    void testSkipUnresolvedConflictOccurrenceSuccessfully() throws Exception {
+        // 1. Create conflicting one-time booking for Alice on Monday 2026-09-07
+        OffsetDateTime conflictStart = OffsetDateTime.parse("2026-09-07T04:30:00Z");
+        OffsetDateTime conflictEnd = OffsetDateTime.parse("2026-09-07T05:30:00Z");
+        bookingRepository.save(Booking.builder()
+                .room(roomAlpha)
+                .user(userBob)
+                .startTime(conflictStart)
+                .endTime(conflictEnd)
+                .status(BookingStatus.CONFIRMED)
+                .reason("Pre-existing Bob meeting")
+                .build());
+
+        // 2. Alice submits recurring booking: 3 occurrences (1st has conflict, 2nd and 3rd succeed)
+        CreateRecurringBookingRequest request = CreateRecurringBookingRequest.builder()
+                .roomId(roomAlpha.getId())
+                .seriesName("Sync Series with Conflict")
+                .frequency(RecurrenceFrequency.WEEKLY)
+                .startDate(LocalDate.parse("2026-09-07"))
+                .endDate(null)
+                .occurrenceCount(3)
+                .startLocalTime(LocalTime.parse("10:00:00"))
+                .endLocalTime(LocalTime.parse("11:00:00"))
+                .daysOfWeek(List.of("MONDAY"))
+                .dayOfMonth(null)
+                .reason("Weekly Team Sync")
+                .build();
+
+        String responseJson = mockMvc.perform(post("/api/bookings/recurring")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.seriesStatus").value("PARTIALLY_CONFIRMED"))
+                .andExpect(jsonPath("$.confirmedCount").value(2))
+                .andExpect(jsonPath("$.conflictCount").value(1))
+                .andExpect(jsonPath("$.occurrences[0].status").value("CONFLICT"))
+                .andExpect(jsonPath("$.occurrences[0].occurrenceIndex").value(1))
+                .andReturn().getResponse().getContentAsString();
+
+        RecurringConfirmationResponse confirmResp = objectMapper.readValue(responseJson, RecurringConfirmationResponse.class);
+        Long seriesId = confirmResp.getSeriesId();
+
+        // 3. Skip occurrence #1 with reason
+        mockMvc.perform(post("/api/bookings/recurring/" + seriesId + "/occurrences/1/skip")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(com.roomsync.booking.dto.SkipOccurrenceRequest.builder()
+                                .reason("Room busy, skipping first occurrence")
+                                .build())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrenceIndex").value(1))
+                .andExpect(jsonPath("$.status").value("SKIPPED"))
+                .andExpect(jsonPath("$.reason").value("Room busy, skipping first occurrence"));
+
+        // 4. Verify persistent exception record
+        assertThat(bookingOccurrenceExceptionRepository.existsBySeriesIdAndOccurrenceIndex(seriesId, 1)).isTrue();
+
+        // 5. Verify GET /api/bookings/recurring/{id} returns SKIPPED for occurrence 1 and series is now ACTIVE
+        mockMvc.perform(get("/api/bookings/recurring/" + seriesId)
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.skippedCount").value(1))
+                .andExpect(jsonPath("$.occurrences[0].status").value("SKIPPED"))
+                .andExpect(jsonPath("$.occurrences[0].occurrenceIndex").value(1))
+                .andExpect(jsonPath("$.occurrences[1].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.occurrences[2].status").value("CONFIRMED"));
+
+        // 6. Verify duplicate skip is idempotent
+        mockMvc.perform(post("/api/bookings/recurring/" + seriesId + "/occurrences/1/skip")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(com.roomsync.booking.dto.SkipOccurrenceRequest.builder()
+                                .reason("Room busy, skipping first occurrence")
+                                .build())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SKIPPED"));
+
+        // 7. Verify audit log entry was created
+        assertThat(auditLogRepository.findAll().stream()
+                .anyMatch(a -> "RECURRING_OCCURRENCE_SKIPPED".equals(a.getAction()))).isTrue();
+    }
 }
+

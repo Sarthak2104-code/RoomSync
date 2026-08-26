@@ -432,6 +432,7 @@ class DataModelConstraintTest {
         );
 
         AgentOperation op = agentOperationRepository.save(AgentOperation.builder()
+                .operationId("op-dm-001")
                 .operationType("NL_BOOKING_CREATE")
                 .actingUser(testUser)
                 .status(AgentOperationStatus.NEEDS_CLARIFICATION)
@@ -480,6 +481,7 @@ class DataModelConstraintTest {
     @DisplayName("AgentAction: Nullable tool_name, JSONB tool_arguments, and ON DELETE RESTRICT on AgentOperation")
     void testAgentActionAndOperationRestrict() {
         AgentOperation op = agentOperationRepository.save(AgentOperation.builder()
+                .operationId("op-dm-002")
                 .operationType("NL_BOOKING_CREATE")
                 .actingUser(testUser)
                 .status(AgentOperationStatus.EXECUTING)

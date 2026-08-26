@@ -61,6 +61,9 @@ class ApiContractRegressionTest {
     @MockitoBean
     private LocationService locationService;
 
+    @MockitoBean
+    private com.roomsync.reliability.service.IdempotencyService idempotencyService;
+
     @Test
     @DisplayName("API Contract: Successful response returns direct DTO and includes X-Correlation-Id header")
     void testSuccessfulDirectDtoContract() throws Exception {

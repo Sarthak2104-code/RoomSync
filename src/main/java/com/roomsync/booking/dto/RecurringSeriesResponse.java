@@ -36,6 +36,11 @@ public class RecurringSeriesResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private List<BookingResponse> bookings;
+    private List<RecurringOccurrenceResult> occurrences;
+    private Integer totalOccurrences;
+    private Integer confirmedCount;
+    private Integer conflictCount;
+    private Integer skippedCount;
 
     public static RecurringSeriesResponse fromEntity(BookingSeries series, List<BookingResponse> bookings) {
         return RecurringSeriesResponse.builder()

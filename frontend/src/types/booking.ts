@@ -38,3 +38,13 @@ export interface BookingFormValues {
   endTime: string
   reason: string
 }
+
+export interface BookingDraft {
+  roomId: number
+  localDate: string
+  startTime: string
+  endTime: string
+  timezone: string
+  reason: string
+  updatedAt?: number
+}
