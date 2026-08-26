@@ -6,6 +6,7 @@ import RoleGuard from '@/auth/RoleGuard'
 import LocationListPage from '@/rooms/LocationListPage'
 import RoomSearchPage from '@/rooms/RoomSearchPage'
 import RoomDetailsPage from '@/rooms/RoomDetailsPage'
+import BookingFormPage from '@/bookings/BookingFormPage'
 import AdminPlaceholderPage from '@/auth/AdminPlaceholderPage'
 
 export const router = createBrowserRouter([
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
       {
         path: '/rooms/:id',
         element: <RoomDetailsPage />,
+      },
+      {
+        path: '/rooms/:roomId/book',
+        element: <BookingFormPage />,
       },
       {
         path: '/locations',

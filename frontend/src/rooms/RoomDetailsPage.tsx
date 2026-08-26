@@ -109,6 +109,13 @@ export const RoomDetailsPage: React.FC = () => {
             <Button variant="outline" size="sm" onClick={fetchRoom}>
               Refresh Status
             </Button>
+            {room.status === 'AVAILABLE' && room.active && (
+              <Link to={`/rooms/${room.id}/book`}>
+                <Button variant="primary" size="sm">
+                  Book this Room &rarr;
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
