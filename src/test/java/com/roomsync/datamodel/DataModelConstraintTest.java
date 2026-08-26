@@ -339,7 +339,7 @@ class DataModelConstraintTest {
                 .status(BookingStatus.CONFIRMED)
                 .build());
 
-        // Duplicate Occurrence 1 for same series -> Must be rejected
+        // Duplicate CONFIRMED Occurrence 1 for same series -> Must be rejected
         assertThatThrownBy(() -> bookingRepository.saveAndFlush(Booking.builder()
                 .room(testRoom)
                 .user(testUser)
@@ -351,6 +351,20 @@ class DataModelConstraintTest {
                 .status(BookingStatus.CONFIRMED)
                 .build()))
                 .isInstanceOf(DataIntegrityViolationException.class);
+
+        // Historical CANCELLED Occurrence 1 for same series CAN coexist with CONFIRMED Occurrence 1
+        Booking cancelledOccurrence1 = bookingRepository.saveAndFlush(Booking.builder()
+                .room(testRoom)
+                .user(testUser)
+                .series(series)
+                .occurrenceIndex(1)
+                .startTime(OffsetDateTime.parse("2026-09-02T09:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-02T09:30:00Z"))
+                .reason("Rescheduled Occurrence 1")
+                .status(BookingStatus.CANCELLED)
+                .cancelledReason("RESCHEDULED")
+                .build());
+        assertThat(cancelledOccurrence1.getId()).isNotNull();
 
         // Multiple one-time bookings (series = null, occurrenceIndex = null) are NOT restricted
         Booking single1 = bookingRepository.save(Booking.builder()

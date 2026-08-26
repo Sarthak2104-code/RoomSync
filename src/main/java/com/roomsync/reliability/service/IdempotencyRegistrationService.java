@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -37,12 +38,49 @@ public class IdempotencyRegistrationService {
     private final DateTimeProvider dateTimeProvider;
 
     @Getter
-    @Builder
     public static class IdempotencyCheckResult {
         private final boolean isReplay;
         private final AgentOperation operation;
         private final IdempotencyRecord record;
+
+        public IdempotencyCheckResult(boolean isReplay, AgentOperation operation, IdempotencyRecord record) {
+            this.isReplay = isReplay;
+            this.operation = operation;
+            this.record = record;
+        }
+
+        public static IdempotencyCheckResultBuilder builder() {
+            return new IdempotencyCheckResultBuilder();
+        }
+
+        public static class IdempotencyCheckResultBuilder {
+            private boolean isReplay;
+            private AgentOperation operation;
+            private IdempotencyRecord record;
+
+            public IdempotencyCheckResultBuilder isReplay(boolean isReplay) {
+                this.isReplay = isReplay;
+                return this;
+            }
+
+            public IdempotencyCheckResultBuilder operation(AgentOperation operation) {
+                this.operation = operation;
+                return this;
+            }
+
+            public IdempotencyCheckResultBuilder record(IdempotencyRecord record) {
+                this.record = record;
+                return this;
+            }
+
+            public IdempotencyCheckResult build() {
+                return new IdempotencyCheckResult(isReplay, operation, record);
+            }
+        }
     }
+
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IdempotencyCheckResult startOrCheckOperation(
@@ -51,6 +89,27 @@ public class IdempotencyRegistrationService {
             String operationType,
             String requestHash,
             Map<String, Object> draftPayload) {
+
+        Optional<IdempotencyRecord> existingOpt = idempotencyRecordRepository
+                .findByScopeUserIdAndIdempotencyKey(userId, idempotencyKey);
+        if (existingOpt.isPresent()) {
+            IdempotencyRecord existing = existingOpt.get();
+            if (!existing.getRequestHash().equals(requestHash)) {
+                log.warn("Idempotency conflict: key '{}' already used with different request hash (existing: {}, incoming: {})",
+                        idempotencyKey, existing.getRequestHash(), requestHash);
+                throw new IdempotencyConflictException("Idempotency key has already been used with a different request payload");
+            }
+
+            log.info("Idempotent replay matched existing operation: {} for user: {} key: {}",
+                    existing.getOperation() != null ? existing.getOperation().getOperationId() : "N/A",
+                    userId, idempotencyKey);
+
+            return IdempotencyCheckResult.builder()
+                    .isReplay(true)
+                    .operation(existing.getOperation())
+                    .record(existing)
+                    .build();
+        }
 
         User user = userRepository.findById(userId).orElse(null);
         OffsetDateTime now = dateTimeProvider.nowOffsetDateTime();
@@ -107,13 +166,30 @@ public class IdempotencyRegistrationService {
                     .record(savedRecord)
                     .build();
 
-        } catch (DataIntegrityViolationException ex) {
+        } catch (Exception ex) {
             log.info("Concurrent idempotency record conflict detected for user: {} key: {}. Reloading existing record...",
                     userId, idempotencyKey);
 
-            IdempotencyRecord existing = idempotencyRecordRepository
-                    .findByScopeUserIdAndIdempotencyKey(userId, idempotencyKey)
-                    .orElseThrow(() -> ex);
+            if (entityManager != null) {
+                entityManager.clear();
+            }
+
+            IdempotencyRecord existing = null;
+            for (int i = 0; i < 5; i++) {
+                existing = idempotencyRecordRepository
+                        .findByScopeUserIdAndIdempotencyKey(userId, idempotencyKey)
+                        .orElse(null);
+                if (existing != null) {
+                    break;
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignored) {}
+            }
+
+            if (existing == null) {
+                throw new IdempotencyConflictException("Idempotency key has already been used with a different request payload");
+            }
 
             if (!existing.getRequestHash().equals(requestHash)) {
                 log.warn("Idempotency conflict: key '{}' already used with different request hash (existing: {}, incoming: {})",

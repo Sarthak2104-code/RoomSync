@@ -69,6 +69,9 @@ class BookingLifecycleIntegrationTest {
     private BookingRepository bookingRepository;
 
     @Autowired
+    private com.roomsync.booking.repository.BookingSeriesRepository bookingSeriesRepository;
+
+    @Autowired
     private BookingService bookingService;
 
     @Autowired
@@ -508,6 +511,300 @@ class BookingLifecycleIntegrationTest {
             Booking aliceOriginal = bookingRepository.findById(aliceBookingId).orElseThrow();
             assertThat(aliceOriginal.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
             assertThat(aliceOriginal.getCancelledReason()).isNull();
+        }
+
+        @Test
+        @DisplayName("TEST 3 & TEST 10: Recurring occurrence reschedule succeeds, soft-cancels original, retains series/occurrence index, and preserves DB invariant")
+        void testRecurringOccurrenceRescheduleSuccessAndInvariant() throws Exception {
+            // Create a recurring series
+            com.roomsync.booking.entity.BookingSeries series = bookingSeriesRepository.save(com.roomsync.booking.entity.BookingSeries.builder()
+                    .user(userAlice)
+                    .seriesName("Sprint Planning")
+                    .frequency(com.roomsync.booking.entity.RecurrenceFrequency.WEEKLY)
+                    .startDate(java.time.LocalDate.now().plusDays(2))
+                    .occurrenceCount(5)
+                    .startLocalTime(java.time.LocalTime.of(10, 0))
+                    .endLocalTime(java.time.LocalTime.of(11, 0))
+                    .timezone("Asia/Kolkata")
+                    .status(com.roomsync.booking.entity.BookingSeriesStatus.ACTIVE)
+                    .build());
+
+            OffsetDateTime originalStart = OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime originalEnd = originalStart.plusHours(1);
+
+            // Create initial confirmed occurrence #1
+            Booking occurrence1 = bookingRepository.save(Booking.builder()
+                    .room(roomAlpha)
+                    .user(userAlice)
+                    .series(series)
+                    .occurrenceIndex(1)
+                    .startTime(originalStart)
+                    .endTime(originalEnd)
+                    .reason("Sprint Planning #1")
+                    .status(BookingStatus.CONFIRMED)
+                    .build());
+
+            Long originalId = occurrence1.getId();
+
+            // Reschedule occurrence #1 to a new time
+            OffsetDateTime newStart = originalStart.withHour(14);
+            OffsetDateTime newEnd = originalStart.withHour(15);
+            RescheduleBookingRequest reschedReq = RescheduleBookingRequest.builder()
+                    .roomId(roomAlpha.getId())
+                    .startTime(newStart)
+                    .endTime(newEnd)
+                    .build();
+
+            String reschedResp = mockMvc.perform(put("/api/bookings/" + originalId)
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(reschedReq)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                    .andExpect(jsonPath("$.rescheduledFromId").value(originalId))
+                    .andExpect(jsonPath("$.seriesId").value(series.getId()))
+                    .andExpect(jsonPath("$.occurrenceIndex").value(1))
+                    .andReturn().getResponse().getContentAsString();
+
+            Long replacementId = objectMapper.readTree(reschedResp).get("id").asLong();
+            assertThat(replacementId).isNotEqualTo(originalId);
+
+            // Verify original in DB is CANCELLED with reason RESCHEDULED and retains series info
+            Booking dbOriginal = bookingRepository.findById(originalId).orElseThrow();
+            assertThat(dbOriginal.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+            assertThat(dbOriginal.getCancelledReason()).isEqualTo("RESCHEDULED");
+            assertThat(dbOriginal.getSeries().getId()).isEqualTo(series.getId());
+            assertThat(dbOriginal.getOccurrenceIndex()).isEqualTo(1);
+
+            // Verify replacement in DB is CONFIRMED, retains series info, and links to original
+            Booking dbReplacement = bookingRepository.findById(replacementId).orElseThrow();
+            assertThat(dbReplacement.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+            assertThat(dbReplacement.getRescheduledFrom().getId()).isEqualTo(originalId);
+            assertThat(dbReplacement.getSeries().getId()).isEqualTo(series.getId());
+            assertThat(dbReplacement.getOccurrenceIndex()).isEqualTo(1);
+            assertThat(dbReplacement.getStartTime()).isEqualTo(newStart);
+            assertThat(dbReplacement.getEndTime()).isEqualTo(newEnd);
+
+            // Verify DB Invariant: At most ONE CONFIRMED booking exists for (series_id, occurrence_index)
+            Integer duplicateConfirmedCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ( " +
+                    "  SELECT series_id, occurrence_index, COUNT(*) " +
+                    "  FROM bookings " +
+                    "  WHERE status = 'CONFIRMED' AND series_id IS NOT NULL AND occurrence_index IS NOT NULL " +
+                    "  GROUP BY series_id, occurrence_index HAVING COUNT(*) > 1 " +
+                    ") dupes", Integer.class);
+            assertThat(duplicateConfirmedCount).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("TEST 4: Reschedule replacement recurring booking again and verify lineage across multiple hops")
+        void testRescheduleRecurringReplacementAgain() throws Exception {
+            com.roomsync.booking.entity.BookingSeries series = bookingSeriesRepository.save(com.roomsync.booking.entity.BookingSeries.builder()
+                    .user(userAlice)
+                    .seriesName("Design Review")
+                    .frequency(com.roomsync.booking.entity.RecurrenceFrequency.WEEKLY)
+                    .startDate(java.time.LocalDate.now().plusDays(3))
+                    .occurrenceCount(4)
+                    .startLocalTime(java.time.LocalTime.of(11, 0))
+                    .endLocalTime(java.time.LocalTime.of(12, 0))
+                    .timezone("Asia/Kolkata")
+                    .status(com.roomsync.booking.entity.BookingSeriesStatus.ACTIVE)
+                    .build());
+
+            OffsetDateTime start1 = OffsetDateTime.now().plusDays(3).withHour(11).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime end1 = start1.plusHours(1);
+
+            Booking orig = bookingRepository.save(Booking.builder()
+                    .room(roomAlpha)
+                    .user(userAlice)
+                    .series(series)
+                    .occurrenceIndex(1)
+                    .startTime(start1)
+                    .endTime(end1)
+                    .reason("Design Review #1")
+                    .status(BookingStatus.CONFIRMED)
+                    .build());
+
+            // First reschedule: 11:00 -> 14:00
+            OffsetDateTime start2 = start1.withHour(14);
+            OffsetDateTime end2 = start1.withHour(15);
+            String resp1 = mockMvc.perform(put("/api/bookings/" + orig.getId())
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(RescheduleBookingRequest.builder()
+                                    .startTime(start2).endTime(end2).build())))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            Long rep1Id = objectMapper.readTree(resp1).get("id").asLong();
+
+            // Second reschedule: 14:00 -> 16:00
+            OffsetDateTime start3 = start1.withHour(16);
+            OffsetDateTime end3 = start1.withHour(17);
+            String resp2 = mockMvc.perform(put("/api/bookings/" + rep1Id)
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(RescheduleBookingRequest.builder()
+                                    .startTime(start3).endTime(end3).build())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                    .andExpect(jsonPath("$.rescheduledFromId").value(rep1Id))
+                    .andExpect(jsonPath("$.seriesId").value(series.getId()))
+                    .andExpect(jsonPath("$.occurrenceIndex").value(1))
+                    .andReturn().getResponse().getContentAsString();
+            Long rep2Id = objectMapper.readTree(resp2).get("id").asLong();
+
+            // Verify all states:
+            // Original: CANCELLED (RESCHEDULED)
+            Booking dbOrig = bookingRepository.findById(orig.getId()).orElseThrow();
+            assertThat(dbOrig.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+            assertThat(dbOrig.getCancelledReason()).isEqualTo("RESCHEDULED");
+
+            // Rep1: CANCELLED (RESCHEDULED)
+            Booking dbRep1 = bookingRepository.findById(rep1Id).orElseThrow();
+            assertThat(dbRep1.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+            assertThat(dbRep1.getCancelledReason()).isEqualTo("RESCHEDULED");
+            assertThat(dbRep1.getRescheduledFrom().getId()).isEqualTo(orig.getId());
+
+            // Rep2: CONFIRMED
+            Booking dbRep2 = bookingRepository.findById(rep2Id).orElseThrow();
+            assertThat(dbRep2.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+            assertThat(dbRep2.getRescheduledFrom().getId()).isEqualTo(rep1Id);
+            assertThat(dbRep2.getSeries().getId()).isEqualTo(series.getId());
+            assertThat(dbRep2.getOccurrenceIndex()).isEqualTo(1);
+
+            // Verify DB Invariant
+            Integer duplicateConfirmedCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ( " +
+                    "  SELECT series_id, occurrence_index, COUNT(*) " +
+                    "  FROM bookings " +
+                    "  WHERE status = 'CONFIRMED' AND series_id IS NOT NULL AND occurrence_index IS NOT NULL " +
+                    "  GROUP BY series_id, occurrence_index HAVING COUNT(*) > 1 " +
+                    ") dupes", Integer.class);
+            assertThat(duplicateConfirmedCount).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("TEST 5 & TEST 6: Idempotent replay and Idempotency Conflict validation")
+        void testRescheduleIdempotencyAndConflict() throws Exception {
+            OffsetDateTime start = OffsetDateTime.now().plusDays(4).withHour(10).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime end = start.plusHours(1);
+
+            Booking booking = bookingRepository.save(Booking.builder()
+                    .room(roomAlpha)
+                    .user(userAlice)
+                    .startTime(start)
+                    .endTime(end)
+                    .reason("Idempotent Test Booking")
+                    .status(BookingStatus.CONFIRMED)
+                    .build());
+
+            String idempotencyKey = java.util.UUID.randomUUID().toString();
+
+            OffsetDateTime newStart = start.withHour(14);
+            OffsetDateTime newEnd = start.withHour(15);
+            RescheduleBookingRequest req = RescheduleBookingRequest.builder()
+                    .startTime(newStart)
+                    .endTime(newEnd)
+                    .build();
+
+            // First execution
+            String resp1 = mockMvc.perform(put("/api/bookings/" + booking.getId() + "/reschedule")
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                    .andReturn().getResponse().getContentAsString();
+            Long firstReplacementId = objectMapper.readTree(resp1).get("id").asLong();
+
+            // Second execution (same key + same payload) -> Replays cached result
+            String resp2 = mockMvc.perform(put("/api/bookings/" + booking.getId() + "/reschedule")
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(firstReplacementId))
+                    .andReturn().getResponse().getContentAsString();
+
+            // Verify no additional booking was created
+            long count = bookingRepository.count();
+            assertThat(count).isEqualTo(2); // Original + exactly 1 replacement
+
+            // Replay with same key but DIFFERENT payload -> 409 IDEMPOTENCY_CONFLICT
+            RescheduleBookingRequest conflictPayload = RescheduleBookingRequest.builder()
+                    .startTime(start.withHour(16))
+                    .endTime(start.withHour(17))
+                    .build();
+
+            mockMvc.perform(put("/api/bookings/" + booking.getId() + "/reschedule")
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(conflictPayload)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("IDEMPOTENCY_CONFLICT"));
+        }
+
+        @Test
+        @DisplayName("TEST 7: Reject rescheduling an already CANCELLED booking")
+        void testRescheduleAlreadyCancelledBooking() throws Exception {
+            OffsetDateTime start = OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime end = start.plusHours(1);
+
+            Booking cancelledBooking = bookingRepository.save(Booking.builder()
+                    .room(roomAlpha)
+                    .user(userAlice)
+                    .startTime(start)
+                    .endTime(end)
+                    .reason("Cancelled Meeting")
+                    .cancelledReason("No longer needed")
+                    .status(BookingStatus.CANCELLED)
+                    .build());
+
+            RescheduleBookingRequest req = RescheduleBookingRequest.builder()
+                    .startTime(start.withHour(14))
+                    .endTime(start.withHour(15))
+                    .build();
+
+            mockMvc.perform(put("/api/bookings/" + cancelledBooking.getId() + "/reschedule")
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("BOOKING_CONFLICT"));
+        }
+
+        @Test
+        @DisplayName("TEST 8: Reject rescheduling a past / COMPLETED booking")
+        void testRescheduleCompletedBooking() throws Exception {
+            OffsetDateTime pastStart = OffsetDateTime.parse("2026-08-20T10:00:00Z");
+            OffsetDateTime pastEnd = OffsetDateTime.parse("2026-08-20T11:00:00Z");
+
+            Booking completedBooking = bookingRepository.save(Booking.builder()
+                    .room(roomAlpha)
+                    .user(userAlice)
+                    .startTime(pastStart)
+                    .endTime(pastEnd)
+                    .reason("Past Architecture Review")
+                    .status(BookingStatus.COMPLETED)
+                    .build());
+
+            OffsetDateTime futureStart = OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime futureEnd = futureStart.plusHours(1);
+
+            RescheduleBookingRequest req = RescheduleBookingRequest.builder()
+                    .startTime(futureStart)
+                    .endTime(futureEnd)
+                    .build();
+
+            mockMvc.perform(put("/api/bookings/" + completedBooking.getId() + "/reschedule")
+                            .header("Authorization", "Bearer " + aliceToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("BOOKING_COMPLETED"));
         }
     }
 

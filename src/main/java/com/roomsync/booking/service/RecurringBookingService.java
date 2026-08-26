@@ -575,7 +575,12 @@ public class RecurringBookingService {
         );
 
         Map<Integer, Booking> bookingMap = bookings.stream()
-                .collect(Collectors.toMap(Booking::getOccurrenceIndex, b -> b, (b1, b2) -> b1));
+                .filter(b -> b.getOccurrenceIndex() != null)
+                .collect(Collectors.toMap(
+                        Booking::getOccurrenceIndex,
+                        b -> b,
+                        (b1, b2) -> (b1.getStatus() == BookingStatus.CONFIRMED) ? b1 : (b2.getStatus() == BookingStatus.CONFIRMED ? b2 : (b1.getId() > b2.getId() ? b1 : b2))
+                ));
 
         Map<Integer, BookingOccurrenceException> exceptionMap = exceptions.stream()
                 .collect(Collectors.toMap(BookingOccurrenceException::getOccurrenceIndex, e -> e, (e1, e2) -> e1));

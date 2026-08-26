@@ -40,7 +40,7 @@ export const LoginPage: React.FC = () => {
   // If already authenticated, redirect
   React.useEffect(() => {
     if (authenticated) {
-      const destination = location.state?.from?.pathname || (role === 'ADMIN' ? '/admin' : '/user')
+      const destination = location.state?.from?.pathname || (role === 'ADMIN' ? '/admin' : '/dashboard')
       navigate(destination, { replace: true })
     }
   }, [authenticated, role, navigate, location.state])
@@ -52,7 +52,7 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await login(data)
       toast.success('Successfully logged in')
-      const destination = location.state?.from?.pathname || (response.role === 'ADMIN' ? '/admin' : '/user')
+      const destination = location.state?.from?.pathname || (response.role === 'ADMIN' ? '/admin' : '/dashboard')
       navigate(destination, { replace: true })
     } catch (err: unknown) {
       const apiErr = err as ApiError

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { roomService } from '@/api/roomService'
 import { locationService } from '@/api/locationService'
 import { amenityService } from '@/api/amenityService'
@@ -26,17 +26,29 @@ import {
 } from '@/components'
 
 export const RoomSearchPage: React.FC = () => {
+  const [searchParams] = useSearchParams()
+
   // Metadata options
   const [locations, setLocations] = useState<LocationResponse[]>([])
   const [amenities, setAmenities] = useState<AmenityResponse[]>([])
 
-  // Filter state
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('')
-  const [minCapacity, setMinCapacity] = useState<string>('')
+  // Filter state initialized from query params if available
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(
+    () => searchParams.get('locationId') || ''
+  )
+  const [minCapacity, setMinCapacity] = useState<string>(
+    () => searchParams.get('capacity') || ''
+  )
   const [selectedAmenityIds, setSelectedAmenityIds] = useState<number[]>([])
-  const [searchDate, setSearchDate] = useState<string>('')
-  const [startTime, setStartTime] = useState<string>('')
-  const [endTime, setEndTime] = useState<string>('')
+  const [searchDate, setSearchDate] = useState<string>(
+    () => searchParams.get('date') || ''
+  )
+  const [startTime, setStartTime] = useState<string>(
+    () => searchParams.get('startTime') || ''
+  )
+  const [endTime, setEndTime] = useState<string>(
+    () => searchParams.get('endTime') || ''
+  )
 
   // Search results state
   const [rooms, setRooms] = useState<RoomResponse[]>([])

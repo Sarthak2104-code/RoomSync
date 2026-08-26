@@ -120,8 +120,8 @@ class OwnershipAndIdorTest {
         // Step 1: User A creates a booking
         CreateBookingRequest createRequest = CreateBookingRequest.builder()
                 .roomId(room.getId())
-                .startTime(OffsetDateTime.parse("2026-08-25T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-25T11:00:00Z"))
+                .startTime(OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .endTime(OffsetDateTime.now().plusDays(2).withHour(11).withMinute(0).withSecond(0).withNano(0))
                 .reason("User A Confidential Meeting")
                 .build();
 

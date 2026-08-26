@@ -59,7 +59,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     """)
     int completePastConfirmedBookings(@Param("now") OffsetDateTime now);
 
-    Optional<Booking> findBySeriesIdAndOccurrenceIndex(Long seriesId, Integer occurrenceIndex);
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.series.id = :seriesId
+          AND b.occurrenceIndex = :occurrenceIndex
+        ORDER BY CASE WHEN b.status = com.roomsync.booking.entity.BookingStatus.CONFIRMED THEN 0 ELSE 1 END, b.id DESC
+    """)
+    List<Booking> findAllBySeriesIdAndOccurrenceIndexOrderActiveFirst(
+        @Param("seriesId") Long seriesId,
+        @Param("occurrenceIndex") Integer occurrenceIndex
+    );
+
+    default Optional<Booking> findBySeriesIdAndOccurrenceIndex(Long seriesId, Integer occurrenceIndex) {
+        List<Booking> list = findAllBySeriesIdAndOccurrenceIndexOrderActiveFirst(seriesId, occurrenceIndex);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 
     List<Booking> findAllBySeriesIdOrderByOccurrenceIndexAsc(Long seriesId);
 

@@ -115,8 +115,8 @@ class HeaderSpoofingSecurityTest {
     void testXUserIdHeaderCannotSpoofIdentity() throws Exception {
         CreateBookingRequest request = CreateBookingRequest.builder()
                 .roomId(room.getId())
-                .startTime(OffsetDateTime.parse("2026-08-26T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-26T11:00:00Z"))
+                .startTime(OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .endTime(OffsetDateTime.now().plusDays(2).withHour(11).withMinute(0).withSecond(0).withNano(0))
                 .reason("Anti-Spoofing Verification")
                 .build();
 

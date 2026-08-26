@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/auth/LoginPage'
 import ProtectedRoute from '@/auth/ProtectedRoute'
 import RoleGuard from '@/auth/RoleGuard'
+import UserDashboardPage from '@/dashboard/UserDashboardPage'
 import LocationListPage from '@/rooms/LocationListPage'
 import RoomSearchPage from '@/rooms/RoomSearchPage'
 import RoomDetailsPage from '@/rooms/RoomDetailsPage'
@@ -10,7 +11,19 @@ import BookingFormPage from '@/bookings/BookingFormPage'
 import MyBookingsPage from '@/bookings/MyBookingsPage'
 import RescheduleBookingPage from '@/bookings/RescheduleBookingPage'
 import RecurringBookingPage from '@/recurring/RecurringBookingPage'
-import AdminPlaceholderPage from '@/auth/AdminPlaceholderPage'
+
+import {
+  AdminLayout,
+  AdminDashboardPage,
+  AdminLocationsPage,
+  AdminRoomsPage,
+  AdminBookingsPage,
+  AdminOccupancyPage,
+  AdminAnalyticsPage,
+  AdminAmenitiesPage,
+  AdminRequestsPage,
+  AdminAuditPage,
+} from '@/admin'
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +37,10 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      {
+        path: '/dashboard',
+        element: <UserDashboardPage />,
+      },
       {
         path: '/rooms',
         element: <RoomSearchPage />,
@@ -74,25 +91,69 @@ export const router = createBrowserRouter([
       },
       {
         path: '/user',
-        element: <Navigate to="/rooms" replace />,
-      },
-      {
-        path: '/admin',
-        element: (
-          <RoleGuard allowedRoles={['ADMIN']}>
-            <AdminPlaceholderPage />
-          </RoleGuard>
-        ),
+        element: <Navigate to="/dashboard" replace />,
       },
       {
         path: '/',
-        element: <Navigate to="/rooms" replace />,
+        element: <Navigate to="/dashboard" replace />,
+      },
+    ],
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute>
+        <RoleGuard allowedRoles={['ADMIN']}>
+          <AdminLayout />
+        </RoleGuard>
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <Navigate to="/admin" replace />,
+      },
+      {
+        path: 'locations',
+        element: <AdminLocationsPage />,
+      },
+      {
+        path: 'rooms',
+        element: <AdminRoomsPage />,
+      },
+      {
+        path: 'bookings',
+        element: <AdminBookingsPage />,
+      },
+      {
+        path: 'occupancy',
+        element: <AdminOccupancyPage />,
+      },
+      {
+        path: 'analytics',
+        element: <AdminAnalyticsPage />,
+      },
+      {
+        path: 'amenities',
+        element: <AdminAmenitiesPage />,
+      },
+      {
+        path: 'requests',
+        element: <AdminRequestsPage />,
+      },
+      {
+        path: 'audit',
+        element: <AdminAuditPage />,
       },
     ],
   },
   {
     path: '*',
-    element: <Navigate to="/rooms" replace />,
+    element: <Navigate to="/dashboard" replace />,
   },
 ])
 
