@@ -1,4 +1,17 @@
 /**
+ * Standard backend error representation matching RoomSync Spring Boot ErrorResponse payload.
+ */
+export interface BackendError {
+  status?: number
+  errorCode?: string
+  message: string
+  validationErrors?: Record<string, string>
+  correlationId?: string
+  path?: string
+  timestamp?: string
+}
+
+/**
  * Backend standardized error response structure matching RoomSync Spring Boot ErrorResponse.
  */
 export interface BackendErrorPayload {
