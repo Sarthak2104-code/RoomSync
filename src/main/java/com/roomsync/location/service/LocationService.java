@@ -68,7 +68,7 @@ public class LocationService {
     @Transactional(readOnly = true)
     public PageResponse<LocationResponse> getLocations(Pageable pageable) {
         Pageable validatedPageable = sanitizePageable(pageable);
-        Page<Location> page = locationRepository.findAllByActiveTrue(validatedPageable);
+        Page<Location> page = locationRepository.findAll(validatedPageable);
         return PageResponse.fromPage(page, LocationResponse::fromEntity);
     }
 

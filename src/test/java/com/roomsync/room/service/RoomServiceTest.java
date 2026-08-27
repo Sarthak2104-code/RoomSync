@@ -254,6 +254,42 @@ class RoomServiceTest {
             assertThatThrownBy(() -> roomService.getRooms(10L, 2L, PageRequest.of(0, 10)))
                     .isInstanceOf(UnauthorizedLocationAccessException.class);
         }
+
+        @Test
+        @DisplayName("Should return all rooms including inactive rooms for admin without location filter")
+        void shouldReturnAllRoomsIncludingInactiveForAdminWithoutLocationFilter() {
+            Pageable pageable = PageRequest.of(0, 10, Sort.by("name").ascending());
+            Page<Room> page = new PageImpl<>(List.of(availableRoom, lockedRoom, inactiveRoom), pageable, 3);
+
+            when(userRepository.findById(30L)).thenReturn(Optional.of(adminUser));
+            when(roomRepository.findAll(any(Pageable.class))).thenReturn(page);
+
+            PageResponse<RoomResponse> result = roomService.getRooms(30L, null, pageable);
+
+            assertThat(result.getContent()).hasSize(3);
+            assertThat(result.getTotalElements()).isEqualTo(3);
+            assertThat(result.getContent()).extracting(RoomResponse::isActive)
+                    .containsExactly(true, true, false);
+            verify(roomRepository).findAll(any(Pageable.class));
+        }
+
+        @Test
+        @DisplayName("Should return all rooms including inactive rooms for admin with location filter")
+        void shouldReturnAllRoomsIncludingInactiveForAdminWithLocationFilter() {
+            Pageable pageable = PageRequest.of(0, 10, Sort.by("name").ascending());
+            Page<Room> page = new PageImpl<>(List.of(availableRoom, inactiveRoom), pageable, 2);
+
+            when(userRepository.findById(30L)).thenReturn(Optional.of(adminUser));
+            when(roomRepository.findAllByLocationId(eq(1L), any(Pageable.class))).thenReturn(page);
+
+            PageResponse<RoomResponse> result = roomService.getRooms(30L, 1L, pageable);
+
+            assertThat(result.getContent()).hasSize(2);
+            assertThat(result.getTotalElements()).isEqualTo(2);
+            assertThat(result.getContent()).extracting(RoomResponse::isActive)
+                    .containsExactly(true, false);
+            verify(roomRepository).findAllByLocationId(eq(1L), any(Pageable.class));
+        }
     }
 
     @Nested

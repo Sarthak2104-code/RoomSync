@@ -131,7 +131,7 @@ class LocationServiceTest {
         Location location = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).build();
         Page<Location> page = new PageImpl<>(List.of(location), PageRequest.of(0, 10), 1);
 
-        when(locationRepository.findAllByActiveTrue(any(Pageable.class))).thenReturn(page);
+        when(locationRepository.findAll(any(Pageable.class))).thenReturn(page);
 
         PageResponse<LocationResponse> response = locationService.getLocations(PageRequest.of(0, 10));
 
