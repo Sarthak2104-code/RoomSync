@@ -127,6 +127,7 @@ class DataModelConstraintTest {
                 .build());
 
         testUser = userRepository.save(User.builder()
+                .wissenId("WT1041")
                 .name("Test Architect")
                 .email("architect@roomsync.com")
                 .password("securePassword123")
@@ -158,8 +159,23 @@ class DataModelConstraintTest {
     @DisplayName("User: Case-insensitive email uniqueness via ux_users_email_lower")
     void testUserCaseInsensitiveEmail() {
         assertThatThrownBy(() -> userRepository.saveAndFlush(User.builder()
+                .wissenId("WT1042")
                 .name("Duplicate Email User")
                 .email("ARCHITECT@roomsync.com")
+                .password("anotherPass")
+                .role(userRole)
+                .location(defaultLocation)
+                .build()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("User: Case-insensitive wissen_id uniqueness via ux_users_wissen_id_lower")
+    void testUserCaseInsensitiveWissenId() {
+        assertThatThrownBy(() -> userRepository.saveAndFlush(User.builder()
+                .wissenId("wt1041")
+                .name("Duplicate Wissen ID User")
+                .email("other@roomsync.com")
                 .password("anotherPass")
                 .role(userRole)
                 .location(defaultLocation)

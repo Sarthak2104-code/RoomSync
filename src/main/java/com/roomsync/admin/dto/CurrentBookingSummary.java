@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 public class CurrentBookingSummary {
     private Long bookingId;
     private Long userId;
+    private String userWissenId;
     private String userName;
     private String userEmail;
     private OffsetDateTime startTime;
@@ -28,6 +29,7 @@ public class CurrentBookingSummary {
         return CurrentBookingSummary.builder()
                 .bookingId(booking.getId())
                 .userId(booking.getUser() != null ? booking.getUser().getId() : null)
+                .userWissenId(booking.getUser() != null ? booking.getUser().getWissenId() : null)
                 .userName(booking.getUser() != null ? booking.getUser().getName() : null)
                 .userEmail(booking.getUser() != null ? booking.getUser().getEmail() : null)
                 .startTime(booking.getStartTime())

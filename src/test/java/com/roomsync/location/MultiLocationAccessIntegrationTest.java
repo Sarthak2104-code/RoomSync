@@ -91,6 +91,7 @@ class MultiLocationAccessIntegrationTest {
                 roleRepository.save(Role.builder().name("ADMIN").build()));
 
         mumbaiUser = userRepository.save(User.builder()
+                .wissenId("WT1051")
                 .name("Alice Mumbai")
                 .email("alice@mumbai.com")
                 .password("hash")
@@ -99,6 +100,7 @@ class MultiLocationAccessIntegrationTest {
                 .build());
 
         puneUser = userRepository.save(User.builder()
+                .wissenId("WT1052")
                 .name("Bob Pune")
                 .email("bob@pune.com")
                 .password("hash")
@@ -107,6 +109,7 @@ class MultiLocationAccessIntegrationTest {
                 .build());
 
         adminUser = userRepository.save(User.builder()
+                .wissenId("WT1053")
                 .name("Global Admin")
                 .email("admin@roomsync.com")
                 .password("hash")
@@ -114,9 +117,9 @@ class MultiLocationAccessIntegrationTest {
                 .location(mumbaiLoc)
                 .build());
 
-        mumbaiToken = jwtTokenProvider.generateAccessToken(mumbaiUser.getId(), mumbaiUser.getEmail(), "USER", mumbaiLoc.getId());
-        puneToken = jwtTokenProvider.generateAccessToken(puneUser.getId(), puneUser.getEmail(), "USER", puneLoc.getId());
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", mumbaiLoc.getId());
+        mumbaiToken = jwtTokenProvider.generateAccessToken(mumbaiUser.getId(), mumbaiUser.getWissenId(), mumbaiUser.getEmail(), "USER", mumbaiLoc.getId());
+        puneToken = jwtTokenProvider.generateAccessToken(puneUser.getId(), puneUser.getWissenId(), puneUser.getEmail(), "USER", puneLoc.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", mumbaiLoc.getId());
     }
 
     @Test
@@ -328,8 +331,8 @@ class MultiLocationAccessIntegrationTest {
         Room mumbaiRoom = roomRepository.save(Room.builder().location(mumbaiLoc).name("Mumbai 1").capacity(10).status(com.roomsync.room.entity.RoomStatus.AVAILABLE).active(true).build());
         Room puneRoom = roomRepository.save(Room.builder().location(puneLoc).name("Pune 1").capacity(10).status(com.roomsync.room.entity.RoomStatus.AVAILABLE).active(true).build());
 
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-30T10:00:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-08-30T11:00:00Z");
+        OffsetDateTime start = OffsetDateTime.parse("2026-09-10T10:00:00Z");
+        OffsetDateTime end = OffsetDateTime.parse("2026-09-10T11:00:00Z");
 
         CreateBookingRequest mumReq = CreateBookingRequest.builder().roomId(mumbaiRoom.getId()).startTime(start).endTime(end).reason("Mumbai Sync").build();
         CreateBookingRequest punReq = CreateBookingRequest.builder().roomId(puneRoom.getId()).startTime(start).endTime(end).reason("Pune Sync").build();

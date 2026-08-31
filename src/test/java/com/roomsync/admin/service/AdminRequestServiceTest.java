@@ -39,6 +39,9 @@ class AdminRequestServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.roomsync.audit.service.AuditService auditService;
+
     @InjectMocks
     private AdminRequestService adminRequestService;
 
@@ -50,12 +53,14 @@ class AdminRequestServiceTest {
     void setUp() {
         requester = User.builder()
                 .id(100L)
+                .wissenId("WT1141")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .build();
 
         admin = User.builder()
                 .id(1L)
+                .wissenId("WT1142")
                 .name("Admin User")
                 .email("admin@roomsync.com")
                 .build();

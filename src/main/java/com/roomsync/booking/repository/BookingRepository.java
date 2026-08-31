@@ -120,8 +120,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Param("endUtc") OffsetDateTime endUtc
     );
 
-    @Query("""
+    @Query(value = """
         SELECT b FROM Booking b
+        JOIN FETCH b.user u
+        JOIN FETCH b.room r
+        WHERE (:locationId IS NULL OR b.room.location.id = :locationId)
+          AND (:roomId IS NULL OR b.room.id = :roomId)
+          AND (:userId IS NULL OR b.user.id = :userId)
+          AND (:status IS NULL OR b.status = :status)
+    """, countQuery = """
+        SELECT COUNT(b) FROM Booking b
         WHERE (:locationId IS NULL OR b.room.location.id = :locationId)
           AND (:roomId IS NULL OR b.room.id = :roomId)
           AND (:userId IS NULL OR b.user.id = :userId)

@@ -110,6 +110,7 @@ class BookingLifecycleIntegrationTest {
                 roleRepository.save(Role.builder().name("ADMIN").build()));
 
         userAlice = userRepository.save(User.builder()
+                .wissenId("WT1091")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash1")
@@ -118,6 +119,7 @@ class BookingLifecycleIntegrationTest {
                 .build());
 
         userBob = userRepository.save(User.builder()
+                .wissenId("WT1092")
                 .name("Bob")
                 .email("bob@roomsync.com")
                 .password("hash2")
@@ -126,6 +128,7 @@ class BookingLifecycleIntegrationTest {
                 .build());
 
         adminUser = userRepository.save(User.builder()
+                .wissenId("WT1093")
                 .name("Admin")
                 .email("admin@roomsync.com")
                 .password("hash3")
@@ -149,9 +152,9 @@ class BookingLifecycleIntegrationTest {
                 .active(true)
                 .build());
 
-        aliceToken = jwtTokenProvider.generateAccessToken(userAlice.getId(), userAlice.getEmail(), "USER", locationMumbai.getId());
-        bobToken = jwtTokenProvider.generateAccessToken(userBob.getId(), userBob.getEmail(), "USER", locationMumbai.getId());
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", locationMumbai.getId());
+        aliceToken = jwtTokenProvider.generateAccessToken(userAlice.getId(), userAlice.getWissenId(), userAlice.getEmail(), "USER", locationMumbai.getId());
+        bobToken = jwtTokenProvider.generateAccessToken(userBob.getId(), userBob.getWissenId(), userBob.getEmail(), "USER", locationMumbai.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", locationMumbai.getId());
     }
 
     @Nested

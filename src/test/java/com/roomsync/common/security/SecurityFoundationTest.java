@@ -16,9 +16,10 @@ class SecurityFoundationTest {
     @Test
     @DisplayName("AuthenticatedUser: Should represent principal correctly")
     void testAuthenticatedUser() {
-        AuthenticatedUser user = new AuthenticatedUser(10L, "admin@roomsync.com", SecurityConstants.ROLE_ADMIN, 1L);
+        AuthenticatedUser user = new AuthenticatedUser(10L, "WT5128", "admin@roomsync.com", SecurityConstants.ROLE_ADMIN, 1L);
 
         assertThat(user.id()).isEqualTo(10L);
+        assertThat(user.wissenId()).isEqualTo("WT5128");
         assertThat(user.email()).isEqualTo("admin@roomsync.com");
         assertThat(user.role()).isEqualTo("ADMIN");
         assertThat(user.locationId()).isEqualTo(1L);
@@ -31,7 +32,7 @@ class SecurityFoundationTest {
         assertThat(UserContextHolder.get()).isEmpty();
         assertThat(UserContextHolder.getUserId()).isNull();
 
-        AuthenticatedUser user = new AuthenticatedUser(5L, "user@roomsync.com", SecurityConstants.ROLE_USER, 2L);
+        AuthenticatedUser user = new AuthenticatedUser(5L, "WI422", "user@roomsync.com", SecurityConstants.ROLE_USER, 2L);
         UserContextHolder.set(user);
 
         assertThat(UserContextHolder.get()).isPresent().contains(user);

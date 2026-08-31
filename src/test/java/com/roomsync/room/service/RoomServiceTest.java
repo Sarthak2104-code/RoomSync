@@ -82,9 +82,9 @@ class RoomServiceTest {
         locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).timezone("Asia/Kolkata").build();
         inactiveLocation = Location.builder().id(3L).name("Delhi").code("DEL").active(false).timezone("Asia/Kolkata").build();
 
-        mumbaiUser = User.builder().id(10L).name("Alice").email("alice@mumbai.com").role(userRole).location(locationMumbai).build();
-        puneUser = User.builder().id(20L).name("Bob").email("bob@pune.com").role(userRole).location(locationPune).build();
-        adminUser = User.builder().id(30L).name("Admin").email("admin@roomsync.com").role(adminRole).location(locationMumbai).build();
+        mumbaiUser = User.builder().id(10L).wissenId("WT1221").name("Alice").email("alice@mumbai.com").role(userRole).location(locationMumbai).build();
+        puneUser = User.builder().id(20L).wissenId("WT1222").name("Bob").email("bob@pune.com").role(userRole).location(locationPune).build();
+        adminUser = User.builder().id(30L).wissenId("WT1223").name("Admin").email("admin@roomsync.com").role(adminRole).location(locationMumbai).build();
 
         availableRoom = Room.builder()
                 .id(1L)

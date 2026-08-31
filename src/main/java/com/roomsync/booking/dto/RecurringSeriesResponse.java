@@ -22,6 +22,8 @@ import java.util.List;
 public class RecurringSeriesResponse {
     private Long id;
     private Long userId;
+    private String userWissenId;
+    private String userName;
     private String seriesName;
     private RecurrenceFrequency frequency;
     private LocalDate startDate;
@@ -45,7 +47,9 @@ public class RecurringSeriesResponse {
     public static RecurringSeriesResponse fromEntity(BookingSeries series, List<BookingResponse> bookings) {
         return RecurringSeriesResponse.builder()
                 .id(series.getId())
-                .userId(series.getUser().getId())
+                .userId(series.getUser() != null ? series.getUser().getId() : null)
+                .userWissenId(series.getUser() != null ? series.getUser().getWissenId() : null)
+                .userName(series.getUser() != null ? series.getUser().getName() : null)
                 .seriesName(series.getSeriesName())
                 .frequency(series.getFrequency())
                 .startDate(series.getStartDate())

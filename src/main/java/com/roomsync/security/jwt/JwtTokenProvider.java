@@ -37,13 +37,14 @@ public class JwtTokenProvider {
     /**
      * Generates a signed JWT Access Token containing user principal details.
      */
-    public String generateAccessToken(Long userId, String email, String role, Long locationId) {
+    public String generateAccessToken(Long userId, String wissenId, String email, String role, Long locationId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessTokenExpirationMs());
 
         return Jwts.builder()
                 .subject(email)
                 .claim("userId", userId)
+                .claim("wissenId", wissenId)
                 .claim("role", role)
                 .claim("locationId", locationId)
                 .claim("tokenType", "ACCESS")
@@ -56,13 +57,14 @@ public class JwtTokenProvider {
     /**
      * Generates a signed cryptographic JWT Refresh Token.
      */
-    public String generateRefreshToken(Long userId, String email) {
+    public String generateRefreshToken(Long userId, String wissenId, String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getRefreshTokenExpirationMs());
 
         return Jwts.builder()
                 .subject(email)
                 .claim("userId", userId)
+                .claim("wissenId", wissenId)
                 .claim("tokenType", "REFRESH")
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -113,6 +115,11 @@ public class JwtTokenProvider {
             return number.longValue();
         }
         return null;
+    }
+
+    public String getWissenIdFromToken(String token) {
+        Object wissenId = getClaims(token).get("wissenId");
+        return wissenId != null ? wissenId.toString() : null;
     }
 
     public String getEmailFromToken(String token) {

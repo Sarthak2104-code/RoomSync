@@ -8,10 +8,11 @@ import type { ApiError } from '@/types/api'
 import { useAuth } from './AuthContext'
 
 const loginSchema = z.object({
-  email: z
+  wissenId: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .min(1, 'Wissen ID is required')
+    .regex(/^(WT|WI)[0-9]+$/i, 'Wissen ID must start with WT or WI followed by digits (e.g., WT5128, WI422)')
+    .transform((val) => val.trim().toUpperCase()),
   password: z.string().min(1, 'Password is required'),
 })
 
@@ -32,7 +33,7 @@ export const LoginPage: React.FC = () => {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      wissenId: '',
       password: '',
     },
   })
@@ -40,7 +41,7 @@ export const LoginPage: React.FC = () => {
   // If already authenticated, redirect
   React.useEffect(() => {
     if (authenticated) {
-      const destination = location.state?.from?.pathname || (role === 'ADMIN' ? '/admin' : '/dashboard')
+      const destination = location.state?.from?.pathname || (role === 'ADMIN' ? '/admin/dashboard' : '/dashboard')
       navigate(destination, { replace: true })
     }
   }, [authenticated, role, navigate, location.state])
@@ -52,13 +53,13 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await login(data)
       toast.success('Successfully logged in')
-      const destination = location.state?.from?.pathname || (response.role === 'ADMIN' ? '/admin' : '/dashboard')
+      const destination = location.state?.from?.pathname || (response.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard')
       navigate(destination, { replace: true })
     } catch (err: unknown) {
       const apiErr = err as ApiError
       const safeMessage =
         apiErr.status === 401
-          ? 'Invalid email or password'
+          ? 'Invalid Wissen ID or password'
           : apiErr.message || 'Unable to sign in. Please try again.'
 
       setAuthError({
@@ -99,27 +100,28 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
             <div>
               <label
-                htmlFor="email"
+                htmlFor="wissenId"
                 className="block text-sm font-medium text-brand-navy text-left"
               >
-                Email address
+                Wissen ID
               </label>
               <div className="mt-1">
                 <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
+                  id="wissenId"
+                  type="text"
+                  placeholder="e.g. WT5128, WI422"
+                  autoComplete="username"
                   disabled={isSubmitting}
-                  aria-invalid={!!errors.email}
-                  aria-describedby={errors.email ? 'email-error' : undefined}
-                  {...register('email')}
-                  className={`block w-full rounded-md border px-3 py-2 text-brand-navy shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-brand-accent sm:text-sm ${
-                    errors.email ? 'border-red-500' : 'border-brand-slate/30'
+                  aria-invalid={!!errors.wissenId}
+                  aria-describedby={errors.wissenId ? 'wissenId-error' : undefined}
+                  {...register('wissenId')}
+                  className={`block w-full rounded-md border px-3 py-2 text-brand-navy uppercase placeholder:normal-case shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-brand-accent sm:text-sm ${
+                    errors.wissenId ? 'border-red-500' : 'border-brand-slate/30'
                   }`}
                 />
-                {errors.email && (
-                  <p id="email-error" className="mt-1 text-xs text-red-600 text-left">
-                    {errors.email.message}
+                {errors.wissenId && (
+                  <p id="wissenId-error" className="mt-1 text-xs text-red-600 text-left">
+                    {errors.wissenId.message}
                   </p>
                 )}
               </div>

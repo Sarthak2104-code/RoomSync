@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/auth/LoginPage'
 import ProtectedRoute from '@/auth/ProtectedRoute'
 import RoleGuard from '@/auth/RoleGuard'
+import { useAuth } from '@/auth/AuthContext'
 import UserDashboardPage from '@/dashboard/UserDashboardPage'
 import LocationListPage from '@/rooms/LocationListPage'
 import RoomSearchPage from '@/rooms/RoomSearchPage'
@@ -11,6 +12,7 @@ import BookingFormPage from '@/bookings/BookingFormPage'
 import MyBookingsPage from '@/bookings/MyBookingsPage'
 import RescheduleBookingPage from '@/bookings/RescheduleBookingPage'
 import RecurringBookingPage from '@/recurring/RecurringBookingPage'
+import ProfilePage from '@/pages/ProfilePage'
 
 import {
   AdminLayout,
@@ -22,8 +24,16 @@ import {
   AdminAnalyticsPage,
   AdminAmenitiesPage,
   AdminRequestsPage,
+  AdminUsersPage,
   AdminAuditPage,
+  AdminSettingsPage,
 } from '@/admin'
+
+// Role-aware Root Redirect Component
+const RootRedirect: React.FC = () => {
+  const { role } = useAuth()
+  return <Navigate to={role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'} replace />
+}
 
 export const router = createBrowserRouter([
   {
@@ -90,12 +100,20 @@ export const router = createBrowserRouter([
         element: <RecurringBookingPage />,
       },
       {
+        path: '/profile',
+        element: <ProfilePage />,
+      },
+      {
+        path: '/settings',
+        element: <ProfilePage />,
+      },
+      {
         path: '/user',
         element: <Navigate to="/dashboard" replace />,
       },
       {
         path: '/',
-        element: <Navigate to="/dashboard" replace />,
+        element: <RootRedirect />,
       },
     ],
   },
@@ -115,7 +133,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <Navigate to="/admin" replace />,
+        element: <AdminDashboardPage />,
+      },
+      {
+        path: 'profile',
+        element: <ProfilePage />,
+      },
+      {
+        path: 'settings',
+        element: <AdminSettingsPage />,
       },
       {
         path: 'locations',
@@ -146,14 +172,22 @@ export const router = createBrowserRouter([
         element: <AdminRequestsPage />,
       },
       {
+        path: 'users',
+        element: <AdminUsersPage />,
+      },
+      {
         path: 'audit',
+        element: <AdminAuditPage />,
+      },
+      {
+        path: 'audit-logs',
         element: <AdminAuditPage />,
       },
     ],
   },
   {
     path: '*',
-    element: <Navigate to="/dashboard" replace />,
+    element: <RootRedirect />,
   },
 ])
 

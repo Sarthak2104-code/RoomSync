@@ -384,7 +384,7 @@ export const AdminBookingsPage: React.FC = () => {
         <TableHeader>
           <TableRow>
             <TableHead>Booking</TableHead>
-            <TableHead>User</TableHead>
+            <TableHead>Wissen ID</TableHead>
             <TableHead>Room</TableHead>
             <TableHead>Date & Time</TableHead>
             <TableHead>Status</TableHead>
@@ -395,6 +395,7 @@ export const AdminBookingsPage: React.FC = () => {
         <TableBody>
           {bookings.map((booking) => {
             const isConfirmed = booking.status === 'CONFIRMED'
+            const displayWissenId = booking.wissenId || booking.userWissenId
             return (
               <TableRow key={booking.id} className="hover:bg-slate-50/70 transition-colors">
                 {/* Booking ID & Metadata */}
@@ -412,11 +413,11 @@ export const AdminBookingsPage: React.FC = () => {
                   )}
                 </TableCell>
 
-                {/* Affected User */}
+                {/* Wissen ID */}
                 <TableCell>
-                  <div className="font-semibold text-brand-navy text-sm">
-                    User #{booking.userId}
-                  </div>
+                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-brand-navy border border-slate-200 inline-block">
+                    {displayWissenId || '-'}
+                  </span>
                 </TableCell>
 
                 {/* Room Name */}
@@ -588,7 +589,7 @@ export const AdminBookingsPage: React.FC = () => {
       <ConfirmDialog
         isOpen={Boolean(cancellingBooking)}
         title="Cancel Booking"
-        description={`Are you sure you want to cancel booking #${cancellingBooking?.id} for User #${cancellingBooking?.userId} in ${cancellingBooking?.roomName}? The booking status will be updated to CANCELLED.`}
+        description={`Are you sure you want to cancel booking #${cancellingBooking?.id} for ${cancellingBooking?.wissenId || cancellingBooking?.userWissenId || (cancellingBooking?.userName ? cancellingBooking.userName : `User #${cancellingBooking?.userId}`)} in ${cancellingBooking?.roomName}? The booking status will be updated to CANCELLED.`}
         confirmLabel="Cancel Booking"
         cancelLabel="Keep Booking"
         variant="danger"

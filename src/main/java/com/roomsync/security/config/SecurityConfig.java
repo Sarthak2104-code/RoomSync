@@ -60,8 +60,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Public authentication endpoints
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Public authentication and OpenAPI endpoints
+                        .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
                         // Room, Location & Amenity read endpoints accessible by all authenticated users
                         .requestMatchers(HttpMethod.GET, "/api/rooms/**", "/api/locations/**", "/api/amenities/**").authenticated()

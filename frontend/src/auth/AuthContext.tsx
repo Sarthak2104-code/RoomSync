@@ -60,6 +60,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const authenticatedUser: User = {
       id: response.userId,
+      wissenId: response.wissenId,
+      name: response.name,
       email: response.email,
       role: (response.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
       locationId: response.locationId,

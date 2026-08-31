@@ -47,6 +47,7 @@ export interface RecurringOccurrenceResult {
   endTime: string
   reason?: string
   conflictReason?: string
+  operationId?: string | null
 }
 
 export interface RecurringConfirmationResponse {
@@ -66,6 +67,8 @@ export interface RecurringConfirmationResponse {
 export interface RecurringSeriesResponse {
   id: number
   userId?: number
+  userWissenId?: string | null
+  userName?: string | null
   seriesName?: string
   name?: string
   frequency: RecurrenceFrequency

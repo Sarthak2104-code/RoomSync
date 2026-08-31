@@ -444,6 +444,15 @@ export const MyBookingsPage: React.FC = () => {
               </div>
             )}
 
+            <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700">
+              <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>Notification Delivery:</strong> Status transitions (confirmation, rescheduling, cancellation, and completion) dispatch asynchronous notifications via the system outbox.
+              </span>
+            </div>
+
             <div className="pt-3 border-t border-brand-slate/10 text-xs text-brand-slate flex justify-between">
               <span>Created: {formatCreatedAt(selectedBooking.createdAt)}</span>
               {selectedBooking.updatedAt && (

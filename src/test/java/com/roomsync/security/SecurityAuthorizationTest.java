@@ -77,6 +77,7 @@ class SecurityAuthorizationTest {
         );
 
         User normalUser = userRepository.save(User.builder()
+                .wissenId("WT1031")
                 .name("Normal User")
                 .email("user.auth@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -86,6 +87,7 @@ class SecurityAuthorizationTest {
                 .build());
 
         User adminUser = userRepository.save(User.builder()
+                .wissenId("WT1032")
                 .name("Admin User")
                 .email("admin.auth@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -94,8 +96,8 @@ class SecurityAuthorizationTest {
                 .active(true)
                 .build());
 
-        userToken = jwtTokenProvider.generateAccessToken(normalUser.getId(), normalUser.getEmail(), "USER", location.getId());
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", location.getId());
+        userToken = jwtTokenProvider.generateAccessToken(normalUser.getId(), normalUser.getWissenId(), normalUser.getEmail(), "USER", location.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", location.getId());
     }
 
     @Test

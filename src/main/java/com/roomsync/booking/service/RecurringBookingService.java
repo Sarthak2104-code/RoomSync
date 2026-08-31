@@ -40,6 +40,7 @@ import com.roomsync.room.exception.RoomNotFoundException;
 import com.roomsync.room.repository.RoomRepository;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.exception.UserBookingBlockedException;
 import com.roomsync.user.exception.UserNotFoundException;
 import com.roomsync.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -83,6 +84,10 @@ public class RecurringBookingService {
     public RecurringPreviewResponse previewSeries(Long userId, CreateRecurringBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from creating recurring bookings. Please contact an administrator.");
+        }
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.getRoomId()));
@@ -135,6 +140,10 @@ public class RecurringBookingService {
     public RecurringConfirmationResponse createAndConfirmSeries(Long userId, CreateRecurringBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from creating recurring bookings. Please contact an administrator.");
+        }
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.getRoomId()));
@@ -384,6 +393,10 @@ public class RecurringBookingService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from allocating alternate room bookings. Please contact an administrator.");
+        }
 
         BookingSeries series = bookingSeriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BookingNotFoundException(seriesId));

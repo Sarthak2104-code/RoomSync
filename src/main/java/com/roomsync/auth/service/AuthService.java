@@ -25,28 +25,28 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        String normalizedWissenId = request.getWissenId() != null ? request.getWissenId().trim().toUpperCase() : "";
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+        User user = userRepository.findByWissenIdIgnoreCase(normalizedWissenId)
+                .orElseThrow(() -> new UnauthorizedException("Invalid Wissen ID or password"));
 
         if (!user.isActive()) {
-            log.warn("Login attempt for inactive user: {}", normalizedEmail);
+            log.warn("Login attempt for inactive user: {}", normalizedWissenId);
             throw new UnauthorizedException("User account is inactive");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.warn("Invalid password for user: {}", normalizedEmail);
-            throw new UnauthorizedException("Invalid email or password");
+            log.warn("Invalid password for user: {}", normalizedWissenId);
+            throw new UnauthorizedException("Invalid Wissen ID or password");
         }
 
         Long locationId = user.getLocation() != null ? user.getLocation().getId() : null;
         String role = user.getRole() != null ? user.getRole().getName() : "USER";
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), role, locationId);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getWissenId(), user.getEmail(), role, locationId);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getWissenId(), user.getEmail());
 
-        log.info("User successfully authenticated: id={}, email={}, role={}", user.getId(), user.getEmail(), role);
+        log.info("User successfully authenticated: id={}, wissenId={}, email={}, role={}", user.getId(), user.getWissenId(), user.getEmail(), role);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -54,6 +54,8 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(jwtTokenProvider.getAccessTokenExpirationMs() / 1000)
                 .userId(user.getId())
+                .wissenId(user.getWissenId())
+                .name(user.getName())
                 .email(user.getEmail())
                 .role(role)
                 .locationId(locationId)
@@ -83,8 +85,8 @@ public class AuthService {
         Long locationId = user.getLocation() != null ? user.getLocation().getId() : null;
         String role = user.getRole() != null ? user.getRole().getName() : "USER";
 
-        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), role, locationId);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getEmail());
+        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getWissenId(), user.getEmail(), role, locationId);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getWissenId(), user.getEmail());
 
         return TokenRefreshResponse.builder()
                 .accessToken(newAccessToken)

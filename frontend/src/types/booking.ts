@@ -20,6 +20,9 @@ export interface BookingResponse {
   roomId: number
   roomName: string
   userId: number
+  wissenId?: string | null
+  userWissenId?: string | null
+  userName?: string | null
   seriesId?: number | null
   occurrenceIndex?: number | null
   startTime: string
@@ -28,6 +31,7 @@ export interface BookingResponse {
   cancelledReason?: string | null
   rescheduledFromId?: number | null
   status: BookingStatus
+  operationId?: string | null
   createdAt: string
   updatedAt: string
 }

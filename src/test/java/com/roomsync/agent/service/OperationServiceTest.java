@@ -41,9 +41,9 @@ class OperationServiceTest {
         Role userRole = Role.builder().id(1L).name("USER").build();
         Role adminRole = Role.builder().id(2L).name("ADMIN").build();
 
-        userA = User.builder().id(10L).name("Alice").role(userRole).build();
-        userB = User.builder().id(20L).name("Bob").role(userRole).build();
-        admin = User.builder().id(99L).name("Admin").role(adminRole).build();
+        userA = User.builder().id(10L).wissenId("WT1161").name("Alice").role(userRole).build();
+        userB = User.builder().id(20L).wissenId("WT1162").name("Bob").role(userRole).build();
+        admin = User.builder().id(99L).wissenId("WT1163").name("Admin").role(adminRole).build();
 
         operationA = AgentOperation.builder()
                 .id(1L)

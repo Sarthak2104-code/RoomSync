@@ -6,6 +6,7 @@ import com.roomsync.admin.entity.AdminRequest;
 import com.roomsync.admin.entity.AdminRequestStatus;
 import com.roomsync.admin.exception.AdminRequestNotFoundException;
 import com.roomsync.admin.repository.AdminRequestRepository;
+import com.roomsync.audit.service.AuditService;
 import com.roomsync.common.response.PageResponse;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.exception.UserNotFoundException;
@@ -17,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +27,7 @@ public class AdminRequestService {
 
     private final AdminRequestRepository adminRequestRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public PageResponse<AdminRequestResponse> getAdminRequests(
@@ -65,6 +69,16 @@ public class AdminRequestService {
 
         AdminRequest saved = adminRequestRepository.save(adminRequest);
         log.info("Resolved AdminRequest id: {} to status: {} by admin: {}", id, saved.getStatus(), adminUserId);
+
+        if (auditService != null) {
+            auditService.logAdminRequestAction(
+                    "ADMIN_REQUEST_RESOLVED",
+                    saved,
+                    adminUserId,
+                    Map.of("status", saved.getStatus().name())
+            );
+        }
+
         return AdminRequestResponse.fromEntity(saved);
     }
 }

@@ -12,6 +12,7 @@ import {
   DatePicker,
   ErrorState,
   Loading,
+  OperationStatus,
   TimePicker,
   toast,
 } from '@/components'
@@ -346,15 +347,35 @@ export const BookingFormPage: React.FC = () => {
               <span className="text-xs text-brand-slate">Timezone</span>
               <span className="text-brand-slate text-xs">Asia/Kolkata (IST)</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-brand-slate">Status</span>
-              <Badge variant="success" size="sm">{confirmedBooking.status}</Badge>
-            </div>
+            {confirmedBooking.operationId && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-brand-slate">Operation ID</span>
+                <span className="font-mono text-brand-navy font-bold">{confirmedBooking.operationId}</span>
+              </div>
+            )}
             <div className="pt-2 border-t border-brand-slate/10">
               <span className="text-xs text-brand-slate block mb-0.5">Reason</span>
               <p className="text-sm text-brand-navy bg-white p-2 rounded border border-brand-slate/10">
                 {confirmedBooking.reason}
               </p>
+            </div>
+
+            {confirmedBooking.operationId && (
+              <div className="pt-2 border-t border-brand-slate/10">
+                <OperationStatus
+                  operationId={confirmedBooking.operationId}
+                  className="mt-2"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-800">
+              <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>
+                <strong>Notification Delivery:</strong> Confirmation notification has been queued in the system outbox for background delivery.
+              </span>
             </div>
           </div>
 

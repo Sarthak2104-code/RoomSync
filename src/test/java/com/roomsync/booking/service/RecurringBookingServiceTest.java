@@ -127,6 +127,7 @@ class RecurringBookingServiceTest {
 
         user = User.builder()
                 .id(100L)
+                .wissenId("WT1201")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .role(userRole)

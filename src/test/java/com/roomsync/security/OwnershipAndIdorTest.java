@@ -85,6 +85,7 @@ class OwnershipAndIdorTest {
         );
 
         User userA = userRepository.save(User.builder()
+                .wissenId("WT1021")
                 .name("User A")
                 .email("usera@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -94,6 +95,7 @@ class OwnershipAndIdorTest {
                 .build());
 
         User userB = userRepository.save(User.builder()
+                .wissenId("WT1022")
                 .name("User B")
                 .email("userb@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -110,8 +112,8 @@ class OwnershipAndIdorTest {
                 .active(true)
                 .build());
 
-        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getEmail(), "USER", location.getId());
-        userBToken = jwtTokenProvider.generateAccessToken(userB.getId(), userB.getEmail(), "USER", location.getId());
+        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getWissenId(), userA.getEmail(), "USER", location.getId());
+        userBToken = jwtTokenProvider.generateAccessToken(userB.getId(), userB.getWissenId(), userB.getEmail(), "USER", location.getId());
     }
 
     @Test

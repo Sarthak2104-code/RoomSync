@@ -88,6 +88,7 @@ class OccupancyServiceTest {
 
         user = User.builder()
                 .id(100L)
+                .wissenId("WT1151")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .build();

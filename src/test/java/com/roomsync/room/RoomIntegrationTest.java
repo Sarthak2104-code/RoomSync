@@ -83,6 +83,7 @@ class RoomIntegrationTest {
                 roleRepository.save(Role.builder().name("ADMIN").build()));
 
         adminUser = userRepository.save(User.builder()
+                .wissenId("WT1131")
                 .name("Admin User")
                 .email("admin@roomsync.com")
                 .password("hash")
@@ -90,7 +91,7 @@ class RoomIntegrationTest {
                 .location(location)
                 .build());
 
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", location.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", location.getId());
     }
 
     @Test

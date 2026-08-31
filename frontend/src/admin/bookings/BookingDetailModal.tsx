@@ -101,17 +101,31 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
 
         {/* Core Attributes Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          {/* Affected User */}
+          {/* User / Booked By */}
           <div className="p-3 bg-white rounded-lg border border-brand-slate/20">
             <div className="text-xs font-semibold text-brand-slate uppercase tracking-wider mb-1">
-              Affected User
+              Booked By / Wissen ID
             </div>
-            <div className="font-bold text-brand-navy flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-brand-navy text-brand-white flex items-center justify-center text-xs font-bold">
-                U
-              </span>
-              User ID: #{booking.userId}
-            </div>
+            {(booking.wissenId || booking.userWissenId) ? (
+              <div>
+                <div className="font-bold text-brand-navy flex items-center gap-2">
+                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-brand-navy border border-slate-200">
+                    {booking.wissenId || booking.userWissenId}
+                  </span>
+                  {booking.userName && <span>{booking.userName}</span>}
+                </div>
+                <div className="text-[11px] font-mono text-brand-slate mt-1">
+                  Internal ID: #{booking.userId}
+                </div>
+              </div>
+            ) : (
+              <div className="font-bold text-brand-navy flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-brand-navy text-brand-white flex items-center justify-center text-xs font-bold">
+                  U
+                </span>
+                {booking.userName || `User #${booking.userId}`}
+              </div>
+            )}
           </div>
 
           {/* Room */}
@@ -190,6 +204,16 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             </p>
           </div>
         )}
+
+        {/* Notification Delivery Context */}
+        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 flex items-center gap-2">
+          <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            <strong>Notification Delivery:</strong> Booking lifecycle events (creation, reschedule, completion, and cancellation) trigger asynchronous notifications via the backend outbox.
+          </span>
+        </div>
 
         {/* Audit Timestamps */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-brand-slate pt-2 border-t border-slate-100">

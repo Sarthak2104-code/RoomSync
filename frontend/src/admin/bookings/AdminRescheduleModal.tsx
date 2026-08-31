@@ -134,7 +134,7 @@ export const AdminRescheduleModal: React.FC<AdminRescheduleModalProps> = ({
       isOpen={isOpen}
       onClose={submitting ? () => {} : onClose}
       title={`Reschedule Booking #${booking.id}`}
-      description={`Rescheduling for User #${booking.userId} in ${booking.roomName}.`}
+      description={`Rescheduling for ${booking.wissenId || booking.userWissenId || (booking.userName ? booking.userName : `User #${booking.userId}`)} in ${booking.roomName}.`}
       size="md"
     >
       <form onSubmit={handleReschedule} className="space-y-4 pt-2">

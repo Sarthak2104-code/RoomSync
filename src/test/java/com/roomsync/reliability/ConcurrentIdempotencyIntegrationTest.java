@@ -108,6 +108,7 @@ public class ConcurrentIdempotencyIntegrationTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         testUser = userRepository.save(User.builder()
+                .wissenId("WT1111")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hashPass")
@@ -117,6 +118,7 @@ public class ConcurrentIdempotencyIntegrationTest {
                 .build());
 
         otherUser = userRepository.save(User.builder()
+                .wissenId("WT1112")
                 .name("Bob")
                 .email("bob@roomsync.com")
                 .password("hashPass")
@@ -133,8 +135,8 @@ public class ConcurrentIdempotencyIntegrationTest {
                 .active(true)
                 .build());
 
-        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getEmail(), "USER", testLocation.getId());
-        otherToken = jwtTokenProvider.generateAccessToken(otherUser.getId(), otherUser.getEmail(), "USER", testLocation.getId());
+        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getWissenId(), testUser.getEmail(), "USER", testLocation.getId());
+        otherToken = jwtTokenProvider.generateAccessToken(otherUser.getId(), otherUser.getWissenId(), otherUser.getEmail(), "USER", testLocation.getId());
     }
 
     @AfterEach

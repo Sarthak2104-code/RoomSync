@@ -121,6 +121,7 @@ class RecurringBookingIntegrationTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         userAlice = userRepository.save(User.builder()
+                .wissenId("WT1101")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash1")
@@ -129,6 +130,7 @@ class RecurringBookingIntegrationTest {
                 .build());
 
         userBob = userRepository.save(User.builder()
+                .wissenId("WT1102")
                 .name("Bob")
                 .email("bob@roomsync.com")
                 .password("hash2")
@@ -152,8 +154,8 @@ class RecurringBookingIntegrationTest {
                 .active(true)
                 .build());
 
-        aliceToken = jwtTokenProvider.generateAccessToken(userAlice.getId(), userAlice.getEmail(), "USER", locationMumbai.getId());
-        bobToken = jwtTokenProvider.generateAccessToken(userBob.getId(), userBob.getEmail(), "USER", locationMumbai.getId());
+        aliceToken = jwtTokenProvider.generateAccessToken(userAlice.getId(), userAlice.getWissenId(), userAlice.getEmail(), "USER", locationMumbai.getId());
+        bobToken = jwtTokenProvider.generateAccessToken(userBob.getId(), userBob.getWissenId(), userBob.getEmail(), "USER", locationMumbai.getId());
     }
 
     @AfterEach

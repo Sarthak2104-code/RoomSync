@@ -2,13 +2,15 @@ export type UserRole = 'USER' | 'ADMIN'
 
 export interface User {
   id: number
+  wissenId: string
+  name?: string
   email: string
   role: UserRole
   locationId?: number | null
 }
 
 export interface LoginRequest {
-  email: string
+  wissenId: string
   password: string
 }
 
@@ -18,6 +20,8 @@ export interface AuthResponse {
   tokenType: string
   expiresIn?: number
   userId: number
+  wissenId: string
+  name: string
   email: string
   role: string
   locationId?: number | null
