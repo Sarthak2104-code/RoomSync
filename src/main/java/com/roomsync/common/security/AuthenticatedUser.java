@@ -7,6 +7,7 @@ import java.io.Serializable;
  */
 public record AuthenticatedUser(
         Long id,
+        String wissenId,
         String email,
         String role,
         Long locationId

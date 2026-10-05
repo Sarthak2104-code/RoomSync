@@ -52,6 +52,9 @@ class BookingControllerTest {
     @MockitoBean
     private BookingService bookingService;
 
+    @MockitoBean
+    private com.roomsync.reliability.service.IdempotencyService idempotencyService;
+
     @Test
     @DisplayName("POST /api/bookings - Should return 201 when request is valid")
     void shouldCreateBooking() throws Exception {

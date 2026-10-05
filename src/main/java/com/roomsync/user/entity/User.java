@@ -10,9 +10,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,6 +44,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank
+    @Pattern(regexp = "^(?i)(WT|WI)[0-9]+$", message = "Wissen ID must start with WT or WI followed by digits")
+    @Column(name = "wissen_id", nullable = false, length = 50, unique = true)
+    private String wissenId;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "location_id", nullable = false)
@@ -68,6 +76,10 @@ public class User {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Builder.Default
+    @Column(name = "booking_enabled", nullable = false)
+    private boolean bookingEnabled = true;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
@@ -75,6 +87,14 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeWissenId() {
+        if (this.wissenId != null) {
+            this.wissenId = this.wissenId.trim().toUpperCase();
+        }
+    }
 
     /**
      * Convenience accessor to retrieve UserRole enum representation of the associated Role entity.

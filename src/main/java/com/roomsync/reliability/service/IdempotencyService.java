@@ -50,7 +50,13 @@ public class IdempotencyService {
         if (checkResult.isReplay()) {
             if (operation != null && operation.getStatus() == AgentOperationStatus.SUCCEEDED && operation.getResultPayload() != null) {
                 log.info("Replaying cached result for operation id: {} key: {}", operation.getOperationId(), trimmedKey);
-                return objectMapper.convertValue(operation.getResultPayload(), responseType);
+                T cached = objectMapper.convertValue(operation.getResultPayload(), responseType);
+                if (cached instanceof com.roomsync.booking.dto.BookingResponse br && operation.getOperationId() != null) {
+                    br.setOperationId(operation.getOperationId());
+                } else if (cached instanceof com.roomsync.booking.dto.RecurringOccurrenceResult ror && operation.getOperationId() != null) {
+                    ror.setOperationId(operation.getOperationId());
+                }
+                return cached;
             }
             if (checkResult.getRecord() != null && checkResult.getRecord().getResponsePayload() != null) {
                 return objectMapper.convertValue(checkResult.getRecord().getResponsePayload(), responseType);
@@ -65,6 +71,11 @@ public class IdempotencyService {
         try {
             T result = businessLogic.get();
             if (opId != null) {
+                if (result instanceof com.roomsync.booking.dto.BookingResponse br) {
+                    br.setOperationId(opId);
+                } else if (result instanceof com.roomsync.booking.dto.RecurringOccurrenceResult ror) {
+                    ror.setOperationId(opId);
+                }
                 Map<String, Object> resultMap = convertToMap(result);
                 String resourceId = extractResourceId(result);
                 registrationService.markOperationSucceeded(opId, operationType.replace("BOOKING_", ""), resourceId, resultMap);

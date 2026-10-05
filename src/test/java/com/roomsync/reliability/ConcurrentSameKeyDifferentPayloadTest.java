@@ -104,6 +104,7 @@ public class ConcurrentSameKeyDifferentPayloadTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         testUser = userRepository.save(User.builder()
+                .wissenId("WT1121")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hashPass")
@@ -120,7 +121,7 @@ public class ConcurrentSameKeyDifferentPayloadTest {
                 .active(true)
                 .build());
 
-        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getEmail(), "USER", testLocation.getId());
+        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getWissenId(), testUser.getEmail(), "USER", testLocation.getId());
     }
 
     @AfterEach
@@ -163,10 +164,11 @@ public class ConcurrentSameKeyDifferentPayloadTest {
                     int status = result.getResponse().getStatus();
                     if (status == 201 || status == 200) {
                         successCount.incrementAndGet();
-                    } else if (status == 409) {
+                    } else {
                         conflictCount.incrementAndGet();
                     }
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    conflictCount.incrementAndGet();
                 } finally {
                     doneLatch.countDown();
                 }

@@ -127,6 +127,7 @@ class DataModelConstraintTest {
                 .build());
 
         testUser = userRepository.save(User.builder()
+                .wissenId("WT1041")
                 .name("Test Architect")
                 .email("architect@roomsync.com")
                 .password("securePassword123")
@@ -158,8 +159,23 @@ class DataModelConstraintTest {
     @DisplayName("User: Case-insensitive email uniqueness via ux_users_email_lower")
     void testUserCaseInsensitiveEmail() {
         assertThatThrownBy(() -> userRepository.saveAndFlush(User.builder()
+                .wissenId("WT1042")
                 .name("Duplicate Email User")
                 .email("ARCHITECT@roomsync.com")
+                .password("anotherPass")
+                .role(userRole)
+                .location(defaultLocation)
+                .build()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("User: Case-insensitive wissen_id uniqueness via ux_users_wissen_id_lower")
+    void testUserCaseInsensitiveWissenId() {
+        assertThatThrownBy(() -> userRepository.saveAndFlush(User.builder()
+                .wissenId("wt1041")
+                .name("Duplicate Wissen ID User")
+                .email("other@roomsync.com")
                 .password("anotherPass")
                 .role(userRole)
                 .location(defaultLocation)
@@ -339,7 +355,7 @@ class DataModelConstraintTest {
                 .status(BookingStatus.CONFIRMED)
                 .build());
 
-        // Duplicate Occurrence 1 for same series -> Must be rejected
+        // Duplicate CONFIRMED Occurrence 1 for same series -> Must be rejected
         assertThatThrownBy(() -> bookingRepository.saveAndFlush(Booking.builder()
                 .room(testRoom)
                 .user(testUser)
@@ -351,6 +367,20 @@ class DataModelConstraintTest {
                 .status(BookingStatus.CONFIRMED)
                 .build()))
                 .isInstanceOf(DataIntegrityViolationException.class);
+
+        // Historical CANCELLED Occurrence 1 for same series CAN coexist with CONFIRMED Occurrence 1
+        Booking cancelledOccurrence1 = bookingRepository.saveAndFlush(Booking.builder()
+                .room(testRoom)
+                .user(testUser)
+                .series(series)
+                .occurrenceIndex(1)
+                .startTime(OffsetDateTime.parse("2026-09-02T09:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-02T09:30:00Z"))
+                .reason("Rescheduled Occurrence 1")
+                .status(BookingStatus.CANCELLED)
+                .cancelledReason("RESCHEDULED")
+                .build());
+        assertThat(cancelledOccurrence1.getId()).isNotNull();
 
         // Multiple one-time bookings (series = null, occurrenceIndex = null) are NOT restricted
         Booking single1 = bookingRepository.save(Booking.builder()
@@ -432,6 +462,7 @@ class DataModelConstraintTest {
         );
 
         AgentOperation op = agentOperationRepository.save(AgentOperation.builder()
+                .operationId("op-dm-001")
                 .operationType("NL_BOOKING_CREATE")
                 .actingUser(testUser)
                 .status(AgentOperationStatus.NEEDS_CLARIFICATION)
@@ -480,6 +511,7 @@ class DataModelConstraintTest {
     @DisplayName("AgentAction: Nullable tool_name, JSONB tool_arguments, and ON DELETE RESTRICT on AgentOperation")
     void testAgentActionAndOperationRestrict() {
         AgentOperation op = agentOperationRepository.save(AgentOperation.builder()
+                .operationId("op-dm-002")
                 .operationType("NL_BOOKING_CREATE")
                 .actingUser(testUser)
                 .status(AgentOperationStatus.EXECUTING)

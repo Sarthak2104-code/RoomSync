@@ -33,6 +33,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,7 @@ public class RecurringOccurrenceWorker {
     private final RoomRepository roomRepository;
     private final BookingRepository bookingRepository;
     private final BookingSeriesRepository bookingSeriesRepository;
+    private final com.roomsync.booking.repository.BookingOccurrenceExceptionRepository bookingOccurrenceExceptionRepository;
     private final BookingConcurrencyService bookingConcurrencyService;
     private final TimezoneService timezoneService;
     private final TimeService timeService;
@@ -133,6 +135,26 @@ public class RecurringOccurrenceWorker {
                 series.getEndLocalTime(),
                 zoneId
         );
+
+        // Check if occurrence was explicitly skipped/excepted
+        Optional<com.roomsync.booking.entity.BookingOccurrenceException> exceptionOpt =
+                bookingOccurrenceExceptionRepository.findBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex);
+        if (exceptionOpt.isPresent()) {
+            com.roomsync.booking.entity.BookingOccurrenceException ex = exceptionOpt.get();
+            log.info("Occurrence {} for series {} has exception {}, skipping booking creation",
+                    occurrenceIndex, seriesId, ex.getExceptionType());
+            return RecurringOccurrenceResult.builder()
+                    .occurrenceIndex(occurrenceIndex)
+                    .date(date)
+                    .status(ex.getExceptionType().name())
+                    .roomId(room.getId())
+                    .roomName(room.getName())
+                    .startTime(interval.startUtc())
+                    .endTime(interval.endUtc())
+                    .reason(ex.getReason())
+                    .conflictReason(null)
+                    .build();
+        }
 
         // 3. Determine all affected local dates across the booking interval
         List<LocalDate> affectedDates = bookingConcurrencyService.calculateAffectedLocalDates(

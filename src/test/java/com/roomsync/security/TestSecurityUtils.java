@@ -15,7 +15,7 @@ public final class TestSecurityUtils {
     private TestSecurityUtils() {}
 
     public static RequestPostProcessor userAuth(Long userId, String role) {
-        AuthenticatedUser principal = new AuthenticatedUser(userId, "user" + userId + "@roomsync.com", role, 1L);
+        AuthenticatedUser principal = new AuthenticatedUser(userId, "WT" + userId, "user" + userId + "@roomsync.com", role, 1L);
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 principal,
                 null,

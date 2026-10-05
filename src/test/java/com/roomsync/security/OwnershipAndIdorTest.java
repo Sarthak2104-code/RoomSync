@@ -85,6 +85,7 @@ class OwnershipAndIdorTest {
         );
 
         User userA = userRepository.save(User.builder()
+                .wissenId("WT1021")
                 .name("User A")
                 .email("usera@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -94,6 +95,7 @@ class OwnershipAndIdorTest {
                 .build());
 
         User userB = userRepository.save(User.builder()
+                .wissenId("WT1022")
                 .name("User B")
                 .email("userb@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -110,8 +112,8 @@ class OwnershipAndIdorTest {
                 .active(true)
                 .build());
 
-        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getEmail(), "USER", location.getId());
-        userBToken = jwtTokenProvider.generateAccessToken(userB.getId(), userB.getEmail(), "USER", location.getId());
+        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getWissenId(), userA.getEmail(), "USER", location.getId());
+        userBToken = jwtTokenProvider.generateAccessToken(userB.getId(), userB.getWissenId(), userB.getEmail(), "USER", location.getId());
     }
 
     @Test
@@ -120,8 +122,8 @@ class OwnershipAndIdorTest {
         // Step 1: User A creates a booking
         CreateBookingRequest createRequest = CreateBookingRequest.builder()
                 .roomId(room.getId())
-                .startTime(OffsetDateTime.parse("2026-08-25T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-25T11:00:00Z"))
+                .startTime(OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .endTime(OffsetDateTime.now().plusDays(2).withHour(11).withMinute(0).withSecond(0).withNano(0))
                 .reason("User A Confidential Meeting")
                 .build();
 

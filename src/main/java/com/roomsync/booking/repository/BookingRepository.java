@@ -59,7 +59,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     """)
     int completePastConfirmedBookings(@Param("now") OffsetDateTime now);
 
-    Optional<Booking> findBySeriesIdAndOccurrenceIndex(Long seriesId, Integer occurrenceIndex);
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.series.id = :seriesId
+          AND b.occurrenceIndex = :occurrenceIndex
+        ORDER BY CASE WHEN b.status = com.roomsync.booking.entity.BookingStatus.CONFIRMED THEN 0 ELSE 1 END, b.id DESC
+    """)
+    List<Booking> findAllBySeriesIdAndOccurrenceIndexOrderActiveFirst(
+        @Param("seriesId") Long seriesId,
+        @Param("occurrenceIndex") Integer occurrenceIndex
+    );
+
+    default Optional<Booking> findBySeriesIdAndOccurrenceIndex(Long seriesId, Integer occurrenceIndex) {
+        List<Booking> list = findAllBySeriesIdAndOccurrenceIndexOrderActiveFirst(seriesId, occurrenceIndex);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 
     List<Booking> findAllBySeriesIdOrderByOccurrenceIndexAsc(Long seriesId);
 
@@ -106,8 +120,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Param("endUtc") OffsetDateTime endUtc
     );
 
-    @Query("""
+    @Query(value = """
         SELECT b FROM Booking b
+        JOIN FETCH b.user u
+        JOIN FETCH b.room r
+        WHERE (:locationId IS NULL OR b.room.location.id = :locationId)
+          AND (:roomId IS NULL OR b.room.id = :roomId)
+          AND (:userId IS NULL OR b.user.id = :userId)
+          AND (:status IS NULL OR b.status = :status)
+    """, countQuery = """
+        SELECT COUNT(b) FROM Booking b
         WHERE (:locationId IS NULL OR b.room.location.id = :locationId)
           AND (:roomId IS NULL OR b.room.id = :roomId)
           AND (:userId IS NULL OR b.user.id = :userId)

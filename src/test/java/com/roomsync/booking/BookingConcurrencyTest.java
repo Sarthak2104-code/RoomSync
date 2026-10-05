@@ -114,6 +114,7 @@ class BookingConcurrencyTest {
         userTokens = new ArrayList<>();
         for (int i = 1; i <= 100; i++) {
             User user = userRepository.save(User.builder()
+                    .wissenId("WT" + (10000 + i))
                     .name("User " + i)
                     .email("user" + i + "@roomsync.com")
                     .password("pass" + i)
@@ -121,7 +122,7 @@ class BookingConcurrencyTest {
                     .location(location)
                     .build());
             users.add(user);
-            userTokens.add(jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), "USER", location.getId()));
+            userTokens.add(jwtTokenProvider.generateAccessToken(user.getId(), user.getWissenId(), user.getEmail(), "USER", location.getId()));
         }
 
         room1 = roomRepository.save(Room.builder()
@@ -144,8 +145,8 @@ class BookingConcurrencyTest {
     @Test
     @DisplayName("Test 1: 100 Concurrent Identical Bookings -> exactly 1 succeeds, 99 BOOKING_CONFLICT (409)")
     void test100ConcurrentIdenticalBookings() throws Exception {
-        OffsetDateTime startTime = OffsetDateTime.parse("2026-08-30T10:00:00Z");
-        OffsetDateTime endTime = OffsetDateTime.parse("2026-08-30T11:00:00Z");
+        OffsetDateTime startTime = OffsetDateTime.parse("2026-09-10T10:00:00Z");
+        OffsetDateTime endTime = OffsetDateTime.parse("2026-09-10T11:00:00Z");
 
         CreateBookingRequest request = CreateBookingRequest.builder()
                 .roomId(room1.getId())
@@ -210,11 +211,11 @@ class BookingConcurrencyTest {
     @Test
     @DisplayName("Test 2: Concurrent Overlapping Bookings -> 1 succeeds, 1 receives 409 BOOKING_CONFLICT")
     void testConcurrentPartialOverlap() throws Exception {
-        OffsetDateTime startA = OffsetDateTime.parse("2026-08-30T10:00:00Z");
-        OffsetDateTime endA = OffsetDateTime.parse("2026-08-30T11:00:00Z");
+        OffsetDateTime startA = OffsetDateTime.parse("2026-09-10T10:00:00Z");
+        OffsetDateTime endA = OffsetDateTime.parse("2026-09-10T11:00:00Z");
 
-        OffsetDateTime startB = OffsetDateTime.parse("2026-08-30T10:30:00Z");
-        OffsetDateTime endB = OffsetDateTime.parse("2026-08-30T11:30:00Z");
+        OffsetDateTime startB = OffsetDateTime.parse("2026-09-10T10:30:00Z");
+        OffsetDateTime endB = OffsetDateTime.parse("2026-09-10T11:30:00Z");
 
         CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).reason("Planning A").build();
         CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).reason("Planning B").build();
@@ -269,11 +270,11 @@ class BookingConcurrencyTest {
     @Test
     @DisplayName("Test 3: Concurrent Non-Overlapping Bookings (10-11, 11-12) -> both succeed (201)")
     void testConcurrentAdjacentBookings() throws Exception {
-        OffsetDateTime startA = OffsetDateTime.parse("2026-08-30T10:00:00Z");
-        OffsetDateTime endA = OffsetDateTime.parse("2026-08-30T11:00:00Z");
+        OffsetDateTime startA = OffsetDateTime.parse("2026-09-10T10:00:00Z");
+        OffsetDateTime endA = OffsetDateTime.parse("2026-09-10T11:00:00Z");
 
-        OffsetDateTime startB = OffsetDateTime.parse("2026-08-30T11:00:00Z");
-        OffsetDateTime endB = OffsetDateTime.parse("2026-08-30T12:00:00Z");
+        OffsetDateTime startB = OffsetDateTime.parse("2026-09-10T11:00:00Z");
+        OffsetDateTime endB = OffsetDateTime.parse("2026-09-10T12:00:00Z");
 
         CreateBookingRequest reqA = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startA).endTime(endA).reason("Session A").build();
         CreateBookingRequest reqB = CreateBookingRequest.builder().roomId(room1.getId()).startTime(startB).endTime(endB).reason("Session B").build();
@@ -324,8 +325,8 @@ class BookingConcurrencyTest {
     @Test
     @DisplayName("Test 4: Different Rooms at same time -> both succeed concurrently without serialization")
     void testConcurrentDifferentRooms() throws Exception {
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-30T10:00:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-08-30T11:00:00Z");
+        OffsetDateTime start = OffsetDateTime.parse("2026-09-10T10:00:00Z");
+        OffsetDateTime end = OffsetDateTime.parse("2026-09-10T11:00:00Z");
 
         CreateBookingRequest req1 = CreateBookingRequest.builder().roomId(room1.getId()).startTime(start).endTime(end).reason("Room 1 Booking").build();
         CreateBookingRequest req2 = CreateBookingRequest.builder().roomId(room2.getId()).startTime(start).endTime(end).reason("Room 2 Booking").build();
@@ -490,14 +491,14 @@ class BookingConcurrencyTest {
         // Direct insert 1
         jdbcTemplate.update(
                 "INSERT INTO bookings (room_id, user_id, start_time, end_time, reason, status) " +
-                        "VALUES (?, ?, '2026-08-30 10:00:00+00', '2026-08-30 11:00:00+00', 'Direct 1', 'CONFIRMED')",
+                        "VALUES (?, ?, '2026-09-10 10:00:00+00', '2026-09-10 11:00:00+00', 'Direct 1', 'CONFIRMED')",
                 room1.getId(), users.get(0).getId()
         );
 
         // Direct overlapping insert 2 bypassing application-level checks
         assertThatThrownBy(() -> jdbcTemplate.update(
                 "INSERT INTO bookings (room_id, user_id, start_time, end_time, reason, status) " +
-                        "VALUES (?, ?, '2026-08-30 10:30:00+00', '2026-08-30 11:30:00+00', 'Direct 2', 'CONFIRMED')",
+                        "VALUES (?, ?, '2026-09-10 10:30:00+00', '2026-09-10 11:30:00+00', 'Direct 2', 'CONFIRMED')",
                 room1.getId(), users.get(1).getId()
         ))
                 .isInstanceOf(DataIntegrityViolationException.class)
@@ -534,8 +535,8 @@ class BookingConcurrencyTest {
         // Create Booking A (10:00 -> 11:00)
         CreateBookingRequest reqA = CreateBookingRequest.builder()
                 .roomId(room1.getId())
-                .startTime(OffsetDateTime.parse("2026-08-30T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-30T11:00:00Z"))
+                .startTime(OffsetDateTime.parse("2026-09-10T10:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-10T11:00:00Z"))
                 .reason("Booking A")
                 .build();
         String respA = mockMvc.perform(post("/api/bookings")
@@ -549,8 +550,8 @@ class BookingConcurrencyTest {
         // Create Booking B (12:00 -> 13:00)
         CreateBookingRequest reqB = CreateBookingRequest.builder()
                 .roomId(room1.getId())
-                .startTime(OffsetDateTime.parse("2026-08-30T12:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-30T13:00:00Z"))
+                .startTime(OffsetDateTime.parse("2026-09-10T12:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-10T13:00:00Z"))
                 .reason("Booking B")
                 .build();
         String respB = mockMvc.perform(post("/api/bookings")
@@ -563,13 +564,13 @@ class BookingConcurrencyTest {
 
         // Both attempt to reschedule to overlapping slots (15:00 -> 16:00 vs 15:30 -> 16:30)
         RescheduleBookingRequest reschedA = RescheduleBookingRequest.builder()
-                .startTime(OffsetDateTime.parse("2026-08-30T15:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-30T16:00:00Z"))
+                .startTime(OffsetDateTime.parse("2026-09-10T15:00:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-10T16:00:00Z"))
                 .build();
 
         RescheduleBookingRequest reschedB = RescheduleBookingRequest.builder()
-                .startTime(OffsetDateTime.parse("2026-08-30T15:30:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-30T16:30:00Z"))
+                .startTime(OffsetDateTime.parse("2026-09-10T15:30:00Z"))
+                .endTime(OffsetDateTime.parse("2026-09-10T16:30:00Z"))
                 .build();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

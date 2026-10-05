@@ -83,6 +83,7 @@ class RoomIntegrationTest {
                 roleRepository.save(Role.builder().name("ADMIN").build()));
 
         adminUser = userRepository.save(User.builder()
+                .wissenId("WT1131")
                 .name("Admin User")
                 .email("admin@roomsync.com")
                 .password("hash")
@@ -90,7 +91,7 @@ class RoomIntegrationTest {
                 .location(location)
                 .build());
 
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", location.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", location.getId());
     }
 
     @Test
@@ -201,7 +202,7 @@ class RoomIntegrationTest {
         Room dbRoom = roomRepository.findById(roomId).orElseThrow();
         assertThat(dbRoom.isActive()).isFalse();
 
-        // 10. Inactive Room should not be returned by GET /api/rooms or GET /api/rooms/{id}
+        // 10. Inactive Room should not be returned by GET /api/rooms/{id}, but admin GET /api/rooms returns it with active=false
         mockMvc.perform(get("/api/rooms/" + roomId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
@@ -209,7 +210,8 @@ class RoomIntegrationTest {
         mockMvc.perform(get("/api/rooms")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(0));
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].active").value(false));
 
         // 11. Deactivating already inactive room should return 409
         mockMvc.perform(delete("/api/rooms/" + roomId)

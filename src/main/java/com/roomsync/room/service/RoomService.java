@@ -105,9 +105,9 @@ public class RoomService {
             roomPage = roomRepository.findAllByLocationIdAndActiveTrue(caller.getLocation().getId(), validatedPageable);
         } else {
             if (locationId != null) {
-                roomPage = roomRepository.findAllByLocationIdAndActiveTrue(locationId, validatedPageable);
+                roomPage = roomRepository.findAllByLocationId(locationId, validatedPageable);
             } else {
-                roomPage = roomRepository.findAllByActiveTrue(validatedPageable);
+                roomPage = roomRepository.findAll(validatedPageable);
             }
         }
 

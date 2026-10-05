@@ -22,6 +22,8 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.transaction.TransactionSystemException;
+
 /**
  * Centralized Global Exception Handler for all RoomSync REST endpoints.
  * Produces standardized ErrorResponse payloads with machine-readable error codes and correlation tracking.
@@ -96,6 +98,82 @@ public class GlobalExceptionHandler {
                 .correlationId(CorrelationContext.get())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handles transaction commit-time exceptions by inspecting and unwrapping underlying root causes.
+     */
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<ErrorResponse> handleTransactionSystemException(TransactionSystemException ex, HttpServletRequest request) {
+        log.error("Transaction system exception while processing request: {}", request.getRequestURI(), ex);
+
+        Throwable rootCause = ex.getRootCause();
+        if (rootCause == null) {
+            rootCause = ex.getMostSpecificCause();
+        }
+
+        if (rootCause instanceof DataIntegrityViolationException dive) {
+            return handleDataIntegrityViolation(dive, request);
+        }
+
+        PSQLException psqlException = extractPSQLException(ex);
+        if (psqlException != null && psqlException.getServerErrorMessage() != null) {
+            String constraint = psqlException.getServerErrorMessage().getConstraint();
+            if ("no_overlapping_bookings".equals(constraint)) {
+                ErrorResponse response = ErrorResponse.builder()
+                        .timestamp(OffsetDateTime.now())
+                        .status(HttpStatus.CONFLICT.value())
+                        .error(HttpStatus.CONFLICT.name())
+                        .errorCode(ErrorCode.BOOKING_CONFLICT.name())
+                        .message("The room is already booked for the selected time.")
+                        .path(request.getRequestURI())
+                        .correlationId(CorrelationContext.get())
+                        .build();
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            if (constraint != null && (constraint.startsWith("ux_") || constraint.endsWith("_key") || constraint.contains("unique"))) {
+                ErrorResponse response = ErrorResponse.builder()
+                        .timestamp(OffsetDateTime.now())
+                        .status(HttpStatus.CONFLICT.value())
+                        .error(HttpStatus.CONFLICT.name())
+                        .errorCode(ErrorCode.DUPLICATE_RESOURCE.name())
+                        .message("A resource with the specified unique field already exists.")
+                        .path(request.getRequestURI())
+                        .correlationId(CorrelationContext.get())
+                        .build();
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+        }
+
+        if (rootCause instanceof jakarta.validation.ConstraintViolationException cve) {
+            Map<String, String> errors = new HashMap<>();
+            for (jakarta.validation.ConstraintViolation<?> violation : cve.getConstraintViolations()) {
+                errors.put(violation.getPropertyPath().toString(), violation.getMessage());
+            }
+            ErrorResponse response = ErrorResponse.builder()
+                    .timestamp(OffsetDateTime.now())
+                    .status(HttpStatus.BAD_REQUEST.value())
+                    .error(HttpStatus.BAD_REQUEST.name())
+                    .errorCode(ErrorCode.VALIDATION_FAILED.name())
+                    .message("Validation failed during transaction processing")
+                    .path(request.getRequestURI())
+                    .correlationId(CorrelationContext.get())
+                    .validationErrors(errors)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error(HttpStatus.INTERNAL_SERVER_ERROR.name())
+                .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.name())
+                .message("An unexpected transaction error occurred")
+                .path(request.getRequestURI())
+                .correlationId(CorrelationContext.get())
+                .build();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -68,6 +68,7 @@ class BookingExclusionConstraintTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         User user = userRepository.save(User.builder()
+                .wissenId("WT1071")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash")

@@ -74,6 +74,12 @@ class RecurringBookingServiceTest {
     private BookingRepository bookingRepository;
 
     @Mock
+    private com.roomsync.booking.repository.BookingOccurrenceExceptionRepository bookingOccurrenceExceptionRepository;
+
+    @Mock
+    private com.roomsync.audit.service.AuditService auditService;
+
+    @Mock
     private AdminRequestRepository adminRequestRepository;
 
     @Mock
@@ -121,6 +127,7 @@ class RecurringBookingServiceTest {
 
         user = User.builder()
                 .id(100L)
+                .wissenId("WT1201")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .role(userRole)

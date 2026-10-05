@@ -40,7 +40,7 @@ class PaginationAndSortingTest {
     @DisplayName("G. Pagination & Sorting: enforces deterministic secondary sorting (id DESC)")
     void testDeterministicSecondarySorting() {
         Role adminRole = Role.builder().id(2L).name("ADMIN").build();
-        User admin = User.builder().id(1L).name("Admin").role(adminRole).build();
+        User admin = User.builder().id(1L).wissenId("WT1171").name("Admin").role(adminRole).build();
 
         OffsetDateTime sameTime = OffsetDateTime.now();
         AgentOperation op1 = AgentOperation.builder().id(101L).operationId("op_101").actingUser(admin).status(AgentOperationStatus.SUCCEEDED).createdAt(sameTime).build();

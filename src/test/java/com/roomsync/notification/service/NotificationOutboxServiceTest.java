@@ -42,7 +42,7 @@ class NotificationOutboxServiceTest {
 
     @BeforeEach
     void setUp() {
-        user = User.builder().id(10L).name("Alice").email("alice@roomsync.com").build();
+        user = User.builder().id(10L).wissenId("WT1211").name("Alice").email("alice@roomsync.com").build();
         location = Location.builder().id(1L).name("Mumbai").timezone("Asia/Kolkata").build();
         room = Room.builder().id(20L).name("Room Alpha").location(location).build();
         booking = Booking.builder()

@@ -82,6 +82,7 @@ class HeaderSpoofingSecurityTest {
         );
 
         userA = userRepository.save(User.builder()
+                .wissenId("WT1011")
                 .name("User A")
                 .email("user.a@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -91,6 +92,7 @@ class HeaderSpoofingSecurityTest {
                 .build());
 
         userB = userRepository.save(User.builder()
+                .wissenId("WT1012")
                 .name("User B")
                 .email("user.b@roomsync.com")
                 .password(passwordEncoder.encode("secret"))
@@ -107,7 +109,7 @@ class HeaderSpoofingSecurityTest {
                 .active(true)
                 .build());
 
-        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getEmail(), "USER", location.getId());
+        userAToken = jwtTokenProvider.generateAccessToken(userA.getId(), userA.getWissenId(), userA.getEmail(), "USER", location.getId());
     }
 
     @Test
@@ -115,8 +117,8 @@ class HeaderSpoofingSecurityTest {
     void testXUserIdHeaderCannotSpoofIdentity() throws Exception {
         CreateBookingRequest request = CreateBookingRequest.builder()
                 .roomId(room.getId())
-                .startTime(OffsetDateTime.parse("2026-08-26T10:00:00Z"))
-                .endTime(OffsetDateTime.parse("2026-08-26T11:00:00Z"))
+                .startTime(OffsetDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0))
+                .endTime(OffsetDateTime.now().plusDays(2).withHour(11).withMinute(0).withSecond(0).withNano(0))
                 .reason("Anti-Spoofing Verification")
                 .build();
 

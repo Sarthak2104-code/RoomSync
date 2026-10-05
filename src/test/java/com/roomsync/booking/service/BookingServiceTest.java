@@ -105,8 +105,8 @@ class BookingServiceTest {
         locationMumbai = Location.builder().id(1L).name("Mumbai").code("MUM").active(true).timezone("Asia/Kolkata").build();
         locationPune = Location.builder().id(2L).name("Pune").code("PUN").active(true).timezone("Asia/Kolkata").build();
 
-        user1 = User.builder().id(1L).name("User One").email("user1@example.com").password("pass").role(userRole).location(locationMumbai).build();
-        user2 = User.builder().id(2L).name("User Two").email("user2@example.com").password("pass").role(userRole).location(locationPune).build();
+        user1 = User.builder().id(1L).wissenId("WT1191").name("User One").email("user1@example.com").password("pass").role(userRole).location(locationMumbai).build();
+        user2 = User.builder().id(2L).wissenId("WT1192").name("User Two").email("user2@example.com").password("pass").role(userRole).location(locationPune).build();
 
         activeAvailableRoom = Room.builder()
                 .id(10L)

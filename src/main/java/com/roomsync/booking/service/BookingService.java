@@ -25,6 +25,7 @@ import com.roomsync.room.exception.RoomNotFoundException;
 import com.roomsync.room.repository.RoomRepository;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.exception.UserBookingBlockedException;
 import com.roomsync.user.exception.UserNotFoundException;
 import com.roomsync.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +78,10 @@ public class BookingService {
     public BookingResponse createBooking(Long userId, CreateBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from creating room bookings. Please contact an administrator.");
+        }
 
         Room room = roomRepository.findByIdForUpdate(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.getRoomId()));
@@ -170,6 +175,10 @@ public class BookingService {
     public BookingResponse rescheduleBooking(Long bookingId, Long userId, RescheduleBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from rescheduling room bookings. Please contact an administrator.");
+        }
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));

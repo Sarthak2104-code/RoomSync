@@ -37,9 +37,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import com.roomsync.admin.dto.AdminUserDetailResponse;
+import com.roomsync.admin.dto.AdminUserSummaryResponse;
+import com.roomsync.admin.dto.UpdateUserBookingAccessRequest;
+import com.roomsync.admin.service.AdminUserService;
+import com.roomsync.audit.dto.AuditLogResponse;
+import com.roomsync.audit.service.AuditService;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -51,7 +58,57 @@ public class AdminController {
     private final AnalyticsService analyticsService;
     private final AdminService adminService;
     private final AdminRequestService adminRequestService;
+    private final AdminUserService adminUserService;
+    private final AuditService auditService;
     private final HttpServletRequest httpRequest;
+
+    @GetMapping("/users")
+    public ResponseEntity<PageResponse<AdminUserSummaryResponse>> getAdminUsers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) Boolean bookingEnabled,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) String role,
+            @PageableDefault(page = 0, size = 10, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
+
+        PageResponse<AdminUserSummaryResponse> response = adminUserService.getAdminUsers(
+                search, locationId, bookingEnabled, active, role, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/users/{id}")
+    public ResponseEntity<AdminUserDetailResponse> getAdminUserById(@PathVariable Long id) {
+        AdminUserDetailResponse response = adminUserService.getAdminUserById(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/users/{id}/booking-access")
+    public ResponseEntity<AdminUserDetailResponse> updateUserBookingAccess(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @Valid @RequestBody UpdateUserBookingAccessRequest request) {
+
+        AuthenticatedUser admin = resolveUser(currentUser);
+        AdminUserDetailResponse response = adminUserService.updateUserBookingAccess(id, admin.id(), request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/audit-logs")
+    public ResponseEntity<PageResponse<AuditLogResponse>> getAuditLogs(
+            @RequestParam(required = false) Long actorUserId,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) Long roomId,
+            @RequestParam(required = false) Long bookingId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime endDate,
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        PageResponse<AuditLogResponse> response = auditService.getAuditLogs(
+                actorUserId, action, entityType, locationId, roomId, bookingId, startDate, endDate, pageable);
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/occupancy")
     public ResponseEntity<PageResponse<RoomOccupancyResponse>> getOccupancy(

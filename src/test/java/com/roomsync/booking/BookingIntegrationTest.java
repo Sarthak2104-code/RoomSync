@@ -93,6 +93,7 @@ class BookingIntegrationTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         user1 = userRepository.save(User.builder()
+                .wissenId("WT1081")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hash1")
@@ -101,6 +102,7 @@ class BookingIntegrationTest {
                 .build());
 
         user2 = userRepository.save(User.builder()
+                .wissenId("WT1082")
                 .name("Bob")
                 .email("bob@roomsync.com")
                 .password("hash2")
@@ -124,8 +126,8 @@ class BookingIntegrationTest {
                 .active(true)
                 .build());
 
-        user1Token = jwtTokenProvider.generateAccessToken(user1.getId(), user1.getEmail(), "USER", location.getId());
-        user2Token = jwtTokenProvider.generateAccessToken(user2.getId(), user2.getEmail(), "USER", location.getId());
+        user1Token = jwtTokenProvider.generateAccessToken(user1.getId(), user1.getWissenId(), user1.getEmail(), "USER", location.getId());
+        user2Token = jwtTokenProvider.generateAccessToken(user2.getId(), user2.getWissenId(), user2.getEmail(), "USER", location.getId());
     }
 
     @Test
@@ -150,6 +152,8 @@ class BookingIntegrationTest {
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.roomId").value(room1.getId()))
                 .andExpect(jsonPath("$.userId").value(user1.getId()))
+                .andExpect(jsonPath("$.userWissenId").value("WT1081"))
+                .andExpect(jsonPath("$.userName").value("Alice"))
                 .andExpect(jsonPath("$.reason").value("Quarterly Strategy Alignment"))
                 .andReturn().getResponse().getContentAsString();
 

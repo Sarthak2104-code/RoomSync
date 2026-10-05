@@ -118,6 +118,7 @@ public class AuditOutboxIntegrationTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         testUser = userRepository.save(User.builder()
+                .wissenId("WT1061")
                 .name("Alice")
                 .email("alice@roomsync.com")
                 .password("hashPass")
@@ -142,7 +143,7 @@ public class AuditOutboxIntegrationTest {
                 .active(true)
                 .build());
 
-        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getEmail(), "USER", testLocation.getId());
+        userToken = jwtTokenProvider.generateAccessToken(testUser.getId(), testUser.getWissenId(), testUser.getEmail(), "USER", testLocation.getId());
     }
 
     @AfterEach

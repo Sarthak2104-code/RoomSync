@@ -76,9 +76,10 @@ class AuthIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/auth/login - Should successfully authenticate active user and return JWT tokens")
+    @DisplayName("POST /api/auth/login - Should successfully authenticate active user with valid Wissen ID (WT5128) and return JWT tokens")
     void testSuccessfulLogin() throws Exception {
         User user = userRepository.save(User.builder()
+                .wissenId("WT5128")
                 .name("Alice User")
                 .email("alice@roomsync.com")
                 .password(passwordEncoder.encode("secret123"))
@@ -88,7 +89,7 @@ class AuthIntegrationTest {
                 .build());
 
         LoginRequest request = LoginRequest.builder()
-                .email("alice@roomsync.com")
+                .wissenId("WT5128")
                 .password("secret123")
                 .build();
 
@@ -100,14 +101,82 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.userId").value(user.getId()))
+                .andExpect(jsonPath("$.wissenId").value("WT5128"))
+                .andExpect(jsonPath("$.name").value("Alice User"))
                 .andExpect(jsonPath("$.email").value("alice@roomsync.com"))
                 .andExpect(jsonPath("$.role").value("USER"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login - Should successfully authenticate with lowercase wissenId (wt5128 -> normalized to WT5128)")
+    void testLoginWithLowercaseWissenId() throws Exception {
+        userRepository.save(User.builder()
+                .wissenId("WT5128")
+                .name("Alice User")
+                .email("alice.lower@roomsync.com")
+                .password(passwordEncoder.encode("secret123"))
+                .role(userRole)
+                .location(testLocation)
+                .active(true)
+                .build());
+
+        LoginRequest request = LoginRequest.builder()
+                .wissenId("wt5128")
+                .password("secret123")
+                .build();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.wissenId").value("WT5128"))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login - Should successfully authenticate with WI prefix (WI422)")
+    void testLoginWithWIPrefix() throws Exception {
+        userRepository.save(User.builder()
+                .wissenId("WI422")
+                .name("Wendy Infotech")
+                .email("wendy@roomsync.com")
+                .password(passwordEncoder.encode("secret123"))
+                .role(userRole)
+                .location(testLocation)
+                .active(true)
+                .build());
+
+        LoginRequest request = LoginRequest.builder()
+                .wissenId("WI422")
+                .password("secret123")
+                .build();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.wissenId").value("WI422"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login - Should return 400 when Wissen ID format is invalid (12345, WX422, WT, WTABC, WT-422)")
+    void testLoginWithInvalidFormat() throws Exception {
+        LoginRequest request = LoginRequest.builder()
+                .wissenId("WX422")
+                .password("secret123")
+                .build();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("POST /api/auth/login - Should return 401 when password is invalid")
     void testLoginWithInvalidPassword() throws Exception {
         userRepository.save(User.builder()
+                .wissenId("WT5555")
                 .name("Bob User")
                 .email("bob@roomsync.com")
                 .password(passwordEncoder.encode("correct-password"))
@@ -117,7 +186,7 @@ class AuthIntegrationTest {
                 .build());
 
         LoginRequest request = LoginRequest.builder()
-                .email("bob@roomsync.com")
+                .wissenId("WT5555")
                 .password("wrong-password")
                 .build();
 
@@ -127,14 +196,14 @@ class AuthIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+                .andExpect(jsonPath("$.message").value("Invalid Wissen ID or password"));
     }
 
     @Test
     @DisplayName("POST /api/auth/login - Should return 401 when user does not exist")
     void testLoginWithNonexistentUser() throws Exception {
         LoginRequest request = LoginRequest.builder()
-                .email("nonexistent@roomsync.com")
+                .wissenId("WT9999")
                 .password("any-password")
                 .build();
 
@@ -150,6 +219,7 @@ class AuthIntegrationTest {
     @DisplayName("POST /api/auth/login - Should return 401 when user is inactive")
     void testLoginWithInactiveUser() throws Exception {
         userRepository.save(User.builder()
+                .wissenId("WT7777")
                 .name("Inactive User")
                 .email("inactive@roomsync.com")
                 .password(passwordEncoder.encode("secret123"))
@@ -159,7 +229,7 @@ class AuthIntegrationTest {
                 .build());
 
         LoginRequest request = LoginRequest.builder()
-                .email("inactive@roomsync.com")
+                .wissenId("WT7777")
                 .password("secret123")
                 .build();
 
@@ -176,6 +246,7 @@ class AuthIntegrationTest {
     @DisplayName("POST /api/auth/refresh - Should issue new access token using valid refresh token")
     void testRefreshTokenSuccess() throws Exception {
         User user = userRepository.save(User.builder()
+                .wissenId("WT8888")
                 .name("Charlie User")
                 .email("charlie@roomsync.com")
                 .password(passwordEncoder.encode("secret123"))
@@ -185,7 +256,7 @@ class AuthIntegrationTest {
                 .build());
 
         LoginRequest loginRequest = LoginRequest.builder()
-                .email("charlie@roomsync.com")
+                .wissenId("WT8888")
                 .password("secret123")
                 .build();
 

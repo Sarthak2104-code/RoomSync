@@ -81,6 +81,9 @@ public class AdminIntegrationTest {
     private AmenityRepository amenityRepository;
 
     @Autowired
+    private com.roomsync.audit.repository.AuditLogRepository auditLogRepository;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
@@ -112,6 +115,7 @@ public class AdminIntegrationTest {
                 roleRepository.save(Role.builder().name("USER").build()));
 
         adminUser = userRepository.save(User.builder()
+                .wissenId("WT1001")
                 .name("Admin User")
                 .email("admin@roomsync.com")
                 .password("hashAdmin")
@@ -121,6 +125,7 @@ public class AdminIntegrationTest {
                 .build());
 
         regularUser = userRepository.save(User.builder()
+                .wissenId("WT1002")
                 .name("User Alice")
                 .email("alice@roomsync.com")
                 .password("hashAlice")
@@ -145,8 +150,8 @@ public class AdminIntegrationTest {
                 .active(true)
                 .build());
 
-        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getEmail(), "ADMIN", locationMumbai.getId());
-        userToken = jwtTokenProvider.generateAccessToken(regularUser.getId(), regularUser.getEmail(), "USER", locationMumbai.getId());
+        adminToken = jwtTokenProvider.generateAccessToken(adminUser.getId(), adminUser.getWissenId(), adminUser.getEmail(), "ADMIN", locationMumbai.getId());
+        userToken = jwtTokenProvider.generateAccessToken(regularUser.getId(), regularUser.getWissenId(), regularUser.getEmail(), "USER", locationMumbai.getId());
     }
 
     @AfterEach
@@ -195,6 +200,7 @@ public class AdminIntegrationTest {
                 .andExpect(jsonPath("$.content[0].administrativeState").value("AVAILABLE"))
                 .andExpect(jsonPath("$.content[0].occupancyStatus").value("OCCUPIED"))
                 .andExpect(jsonPath("$.content[0].currentBooking.userName").value("User Alice"))
+                .andExpect(jsonPath("$.content[0].currentBooking.userWissenId").value("WT1002"))
                 .andExpect(jsonPath("$.content[1].roomId").value(roomBeta.getId()))
                 .andExpect(jsonPath("$.content[1].administrativeState").value("LOCKED"))
                 .andExpect(jsonPath("$.content[1].occupancyStatus").value("LOCKED"));
@@ -293,13 +299,15 @@ public class AdminIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(request.getId()))
-                .andExpect(jsonPath("$.content[0].status").value("OPEN"));
+                .andExpect(jsonPath("$.content[0].status").value("OPEN"))
+                .andExpect(jsonPath("$.content[0].requesterUserWissenId").value("WT1002"));
 
         // 2. View single request
         mockMvc.perform(get("/api/admin/requests/" + request.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Please approve room override"));
+                .andExpect(jsonPath("$.message").value("Please approve room override"))
+                .andExpect(jsonPath("$.requesterUserWissenId").value("WT1002"));
 
         // 3. Resolve request
         ResolveAdminRequestRequest resolveDto = ResolveAdminRequestRequest.builder()
@@ -313,7 +321,8 @@ public class AdminIntegrationTest {
                         .content(objectMapper.writeValueAsString(resolveDto)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"))
-                .andExpect(jsonPath("$.resolvedByUserId").value(adminUser.getId()));
+                .andExpect(jsonPath("$.resolvedByUserId").value(adminUser.getId()))
+                .andExpect(jsonPath("$.resolvedByUserWissenId").value("WT1001"));
     }
 
     @Test
@@ -341,5 +350,106 @@ public class AdminIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    @DisplayName("Admin Audit Logs: Admin can query paginated audit logs with filters, normal user gets 403")
+    void testAdminAuditLogs() throws Exception {
+        Booking booking = bookingRepository.save(Booking.builder()
+                .room(roomAlpha)
+                .user(regularUser)
+                .startTime(OffsetDateTime.now().plusHours(1))
+                .endTime(OffsetDateTime.now().plusHours(2))
+                .status(BookingStatus.CONFIRMED)
+                .reason("Quarterly Review")
+                .build());
+
+        // Create an audit log record
+        com.roomsync.audit.entity.AuditLog auditLog = com.roomsync.audit.entity.AuditLog.builder()
+                .actorUser(adminUser)
+                .affectedUser(regularUser)
+                .action("BOOKING_CREATED")
+                .entityType("BOOKING")
+                .entityId(booking.getId().toString())
+                .location(locationMumbai)
+                .room(roomAlpha)
+                .booking(booking)
+                .metadata(java.util.Map.of("reason", "Quarterly Review", "actorType", "ADMIN"))
+                .build();
+        auditLogRepository.save(auditLog);
+
+        // 1. Normal user should be rejected (403 Forbidden)
+        mockMvc.perform(get("/api/admin/audit-logs")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+
+        // 2. Admin should successfully retrieve audit logs
+        mockMvc.perform(get("/api/admin/audit-logs")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].action").value("BOOKING_CREATED"))
+                .andExpect(jsonPath("$.content[0].actorUserId").value(adminUser.getId()))
+                .andExpect(jsonPath("$.content[0].actorWissenId").value("WT1001"))
+                .andExpect(jsonPath("$.content[0].actorEmail").value(adminUser.getEmail()))
+                .andExpect(jsonPath("$.content[0].affectedUserId").value(regularUser.getId()))
+                .andExpect(jsonPath("$.content[0].affectedUserWissenId").value("WT1002"))
+                .andExpect(jsonPath("$.content[0].entityType").value("BOOKING"))
+                .andExpect(jsonPath("$.totalElements").isNumber());
+
+        // 3. Admin filter by action
+        mockMvc.perform(get("/api/admin/audit-logs")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("action", "BOOKING_CREATED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].action").value("BOOKING_CREATED"));
+    }
+
+    @Test
+    @DisplayName("Admin Bookings API: returns actual database wissenId for booking owner")
+    void testAdminGetBookingsReturnsActualDatabaseWissenId() throws Exception {
+        Role userRole = roleRepository.findByName("USER").orElseThrow();
+        User userA = userRepository.save(User.builder()
+                .wissenId("WT900014")
+                .name("User A")
+                .email("userA@roomsync.com")
+                .password("hashUserA")
+                .role(userRole)
+                .location(locationMumbai)
+                .active(true)
+                .build());
+
+        Booking bookingA = bookingRepository.save(Booking.builder()
+                .room(roomAlpha)
+                .user(userA)
+                .startTime(OffsetDateTime.now().plusDays(1))
+                .endTime(OffsetDateTime.now().plusDays(1).plusHours(1))
+                .status(BookingStatus.CONFIRMED)
+                .reason("Quarterly Planning")
+                .build());
+
+        // GET /api/admin/bookings
+        mockMvc.perform(get("/api/admin/bookings")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("userId", userA.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].id").value(bookingA.getId()))
+                .andExpect(jsonPath("$.content[0].userId").value(userA.getId()))
+                .andExpect(jsonPath("$.content[0].wissenId").value("WT900014"))
+                .andExpect(jsonPath("$.content[0].userWissenId").value("WT900014"))
+                .andExpect(jsonPath("$.content[0].userName").value("User A"));
+
+        // GET /api/admin/bookings/{id}
+        mockMvc.perform(get("/api/admin/bookings/" + bookingA.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(bookingA.getId()))
+                .andExpect(jsonPath("$.userId").value(userA.getId()))
+                .andExpect(jsonPath("$.wissenId").value("WT900014"))
+                .andExpect(jsonPath("$.userWissenId").value("WT900014"))
+                .andExpect(jsonPath("$.userName").value("User A"));
     }
 }

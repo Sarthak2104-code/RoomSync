@@ -4,6 +4,7 @@ import com.roomsync.admin.dto.AdminRequestResponse;
 import com.roomsync.admin.entity.AdminRequest;
 import com.roomsync.admin.entity.AdminRequestStatus;
 import com.roomsync.admin.repository.AdminRequestRepository;
+import com.roomsync.audit.service.AuditService;
 import com.roomsync.booking.dto.BookingResponse;
 import com.roomsync.booking.dto.ContactAdminOccurrenceRequest;
 import com.roomsync.booking.dto.CreateRecurringBookingRequest;
@@ -14,13 +15,16 @@ import com.roomsync.booking.dto.RecurringPreviewResponse;
 import com.roomsync.booking.dto.RecurringSeriesResponse;
 import com.roomsync.booking.dto.ResolveAlternateRoomRequest;
 import com.roomsync.booking.entity.Booking;
+import com.roomsync.booking.entity.BookingOccurrenceException;
 import com.roomsync.booking.entity.BookingSeries;
 import com.roomsync.booking.entity.BookingSeriesStatus;
 import com.roomsync.booking.entity.BookingStatus;
+import com.roomsync.booking.entity.OccurrenceExceptionType;
 import com.roomsync.booking.exception.BookingNotFoundException;
 import com.roomsync.booking.exception.BookingOverlapException;
 import com.roomsync.booking.exception.RoomNotBookableException;
 import com.roomsync.booking.exception.UnauthorizedBookingOperationException;
+import com.roomsync.booking.repository.BookingOccurrenceExceptionRepository;
 import com.roomsync.booking.repository.BookingRepository;
 import com.roomsync.booking.repository.BookingSeriesRepository;
 import com.roomsync.common.time.BookingInterval;
@@ -36,6 +40,7 @@ import com.roomsync.room.exception.RoomNotFoundException;
 import com.roomsync.room.repository.RoomRepository;
 import com.roomsync.user.entity.User;
 import com.roomsync.user.entity.UserRole;
+import com.roomsync.user.exception.UserBookingBlockedException;
 import com.roomsync.user.exception.UserNotFoundException;
 import com.roomsync.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +53,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,12 +68,14 @@ public class RecurringBookingService {
     private final LocationRepository locationRepository;
     private final BookingSeriesRepository bookingSeriesRepository;
     private final BookingRepository bookingRepository;
+    private final BookingOccurrenceExceptionRepository bookingOccurrenceExceptionRepository;
     private final AdminRequestRepository adminRequestRepository;
     private final RecurrenceGenerator recurrenceGenerator;
     private final RecurringConflictService recurringConflictService;
     private final RecurringOccurrenceWorker recurringOccurrenceWorker;
     private final BookingConcurrencyService bookingConcurrencyService;
     private final BookingService bookingService;
+    private final AuditService auditService;
     private final TimezoneService timezoneService;
     private final TimeService timeService;
     private final Clock clock;
@@ -74,6 +84,10 @@ public class RecurringBookingService {
     public RecurringPreviewResponse previewSeries(Long userId, CreateRecurringBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from creating recurring bookings. Please contact an administrator.");
+        }
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.getRoomId()));
@@ -126,6 +140,10 @@ public class RecurringBookingService {
     public RecurringConfirmationResponse createAndConfirmSeries(Long userId, CreateRecurringBookingRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from creating recurring bookings. Please contact an administrator.");
+        }
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException(request.getRoomId()));
@@ -182,7 +200,9 @@ public class RecurringBookingService {
                         request.getReason()
                 );
                 results.add(result);
-                confirmedCount++;
+                if ("CONFIRMED".equals(result.getStatus())) {
+                    confirmedCount++;
+                }
             } catch (Exception ex) {
                 log.info("Occurrence {} for series {} had conflict: {}", occ.getOccurrenceIndex(), savedSeries.getId(), ex.getMessage());
                 conflictCount++;
@@ -245,6 +265,126 @@ public class RecurringBookingService {
     }
 
     @Transactional
+    public RecurringOccurrenceResult skipOccurrence(Long seriesId, Integer occurrenceIndex, Long userId, String reason) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        BookingSeries series = bookingSeriesRepository.findById(seriesId)
+                .orElseThrow(() -> new BookingNotFoundException(seriesId));
+
+        if (user.getRoleEnum() == UserRole.USER && !series.getUser().getId().equals(userId)) {
+            throw new UnauthorizedBookingOperationException("User is not authorized to skip occurrences of this series");
+        }
+
+        // Validate occurrence index against recurrence bounds
+        List<String> daysOfWeekList = (series.getDaysOfWeek() != null && !series.getDaysOfWeek().isEmpty())
+                ? List.of(series.getDaysOfWeek().split(","))
+                : null;
+
+        List<RecurrenceGenerator.OccurrenceDate> occurrenceDates = recurrenceGenerator.generateOccurrences(
+                series.getFrequency(),
+                series.getStartDate(),
+                series.getEndDate(),
+                series.getOccurrenceCount(),
+                daysOfWeekList,
+                series.getDayOfMonth()
+        );
+
+        RecurrenceGenerator.OccurrenceDate targetOcc = occurrenceDates.stream()
+                .filter(o -> o.getOccurrenceIndex() == occurrenceIndex)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Invalid occurrence index for series: " + occurrenceIndex));
+
+        // Ensure occurrence does not already have a confirmed booking
+        Optional<Booking> existingBookingOpt = bookingRepository.findBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex);
+        if (existingBookingOpt.isPresent() && existingBookingOpt.get().getStatus() == BookingStatus.CONFIRMED) {
+            throw new BookingOverlapException("Cannot skip an occurrence that is already confirmed as a booking");
+        }
+
+        // Idempotency: if already skipped, return existing skipped record
+        Optional<BookingOccurrenceException> existingExceptionOpt =
+                bookingOccurrenceExceptionRepository.findBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex);
+
+        BookingOccurrenceException exception;
+        if (existingExceptionOpt.isPresent()) {
+            exception = existingExceptionOpt.get();
+        } else {
+            String skipReason = (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Skipped by user";
+            exception = BookingOccurrenceException.builder()
+                    .series(series)
+                    .occurrenceIndex(occurrenceIndex)
+                    .exceptionType(OccurrenceExceptionType.SKIPPED)
+                    .reason(skipReason)
+                    .createdByUser(user)
+                    .build();
+            exception = bookingOccurrenceExceptionRepository.save(exception);
+
+            auditService.logBookingAction(
+                    "RECURRING_OCCURRENCE_SKIPPED",
+                    null,
+                    userId,
+                    Map.of(
+                            "seriesId", seriesId,
+                            "occurrenceIndex", occurrenceIndex,
+                            "reason", skipReason
+                    )
+            );
+        }
+
+        // Re-evaluate series status
+        List<Booking> allBookings = bookingRepository.findAllBySeriesIdOrderByOccurrenceIndexAsc(seriesId);
+        List<BookingOccurrenceException> allExceptions = bookingOccurrenceExceptionRepository.findAllBySeriesIdOrderByOccurrenceIndexAsc(seriesId);
+
+        Set<Integer> confirmedIndices = allBookings.stream()
+                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getOccurrenceIndex)
+                .collect(Collectors.toSet());
+
+        Set<Integer> skippedIndices = allExceptions.stream()
+                .filter(e -> e.getExceptionType() == OccurrenceExceptionType.SKIPPED)
+                .map(BookingOccurrenceException::getOccurrenceIndex)
+                .collect(Collectors.toSet());
+
+        boolean allResolved = true;
+        for (RecurrenceGenerator.OccurrenceDate occ : occurrenceDates) {
+            if (!confirmedIndices.contains(occ.getOccurrenceIndex()) && !skippedIndices.contains(occ.getOccurrenceIndex())) {
+                allResolved = false;
+                break;
+            }
+        }
+
+        if (allResolved && series.getStatus() == BookingSeriesStatus.PARTIALLY_CONFIRMED) {
+            series.setStatus(BookingSeriesStatus.ACTIVE);
+            bookingSeriesRepository.save(series);
+        }
+
+        Long roomId = allBookings.isEmpty() ? null : allBookings.get(0).getRoom().getId();
+        String roomName = allBookings.isEmpty() ? null : allBookings.get(0).getRoom().getName();
+
+        ZoneId zoneId = ZoneId.of(series.getTimezone());
+        BookingInterval interval = timeService.calculateBookingInterval(
+                targetOcc.getDate(),
+                series.getStartLocalTime(),
+                series.getEndLocalTime(),
+                zoneId
+        );
+
+        log.info("Recorded persistent skip for occurrence #{} of series #{}", occurrenceIndex, seriesId);
+
+        return RecurringOccurrenceResult.builder()
+                .occurrenceIndex(occurrenceIndex)
+                .date(targetOcc.getDate())
+                .status("SKIPPED")
+                .roomId(roomId)
+                .roomName(roomName)
+                .startTime(interval.startUtc())
+                .endTime(interval.endUtc())
+                .reason(exception.getReason())
+                .conflictReason(null)
+                .build();
+    }
+
+    @Transactional
     public BookingResponse resolveOccurrenceWithAlternateRoom(
             Long seriesId,
             Integer occurrenceIndex,
@@ -254,11 +394,19 @@ public class RecurringBookingService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
+        if (!user.isBookingEnabled()) {
+            throw new UserBookingBlockedException("Your account is currently restricted from allocating alternate room bookings. Please contact an administrator.");
+        }
+
         BookingSeries series = bookingSeriesRepository.findById(seriesId)
                 .orElseThrow(() -> new BookingNotFoundException(seriesId));
 
         if (user.getRoleEnum() == UserRole.USER && !series.getUser().getId().equals(userId)) {
             throw new UnauthorizedBookingOperationException("User is not authorized to resolve occurrences of this series");
+        }
+
+        if (bookingOccurrenceExceptionRepository.existsBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex)) {
+            throw new BookingOverlapException("Cannot book alternate room for a skipped occurrence");
         }
 
         Optional<Booking> existingBookingOpt = bookingRepository.findBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex);
@@ -304,7 +452,7 @@ public class RecurringBookingService {
         }
 
         if (alternateRoom.getStatus() == RoomStatus.LOCKED) {
-            throw new RoomNotBookableException("Alternate room is locked");
+            throw new RoomNotBookableException("Alternate room is currently locked");
         }
 
         ZoneId zoneId = timezoneService.getLocationZoneId(altLocation);
@@ -325,7 +473,7 @@ public class RecurringBookingService {
         bookingConcurrencyService.acquireAdvisoryLocks(lockKeys);
 
         if (bookingRepository.existsOverlappingBooking(alternateRoom.getId(), interval.startUtc(), interval.endUtc())) {
-            throw new BookingOverlapException("The alternate room is also unavailable for the requested time slot");
+            throw new BookingOverlapException("The requested alternate room has a conflicting booking during this interval");
         }
 
         Booking booking;
@@ -351,7 +499,7 @@ public class RecurringBookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // If series was PARTIALLY_CONFIRMED, check if all occurrences are now confirmed
+        // If series was PARTIALLY_CONFIRMED, check if all occurrences are now resolved
         if (series.getStatus() == BookingSeriesStatus.PARTIALLY_CONFIRMED) {
             List<Booking> allBookings = bookingRepository.findAllBySeriesIdOrderByOccurrenceIndexAsc(seriesId);
             long confirmedCount = allBookings.stream().filter(b -> b.getStatus() == BookingStatus.CONFIRMED).count();
@@ -380,6 +528,10 @@ public class RecurringBookingService {
 
         if (user.getRoleEnum() == UserRole.USER && !series.getUser().getId().equals(userId)) {
             throw new UnauthorizedBookingOperationException("User is not authorized to escalate occurrences of this series");
+        }
+
+        if (bookingOccurrenceExceptionRepository.existsBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex)) {
+            throw new BookingOverlapException("Cannot request admin assistance for a skipped occurrence");
         }
 
         Optional<Booking> bookingOpt = bookingRepository.findBySeriesIdAndOccurrenceIndex(seriesId, occurrenceIndex);
@@ -416,10 +568,122 @@ public class RecurringBookingService {
         }
 
         List<Booking> bookings = bookingRepository.findAllBySeriesIdOrderByOccurrenceIndexAsc(seriesId);
+        List<BookingOccurrenceException> exceptions = bookingOccurrenceExceptionRepository.findAllBySeriesIdOrderByOccurrenceIndexAsc(seriesId);
+
         List<BookingResponse> bookingResponses = bookings.stream()
                 .map(b -> BookingResponse.fromEntity(b, clock))
                 .toList();
 
-        return RecurringSeriesResponse.fromEntity(series, bookingResponses);
+        List<String> daysOfWeekList = (series.getDaysOfWeek() != null && !series.getDaysOfWeek().isEmpty())
+                ? List.of(series.getDaysOfWeek().split(","))
+                : null;
+
+        List<RecurrenceGenerator.OccurrenceDate> occurrenceDates = recurrenceGenerator.generateOccurrences(
+                series.getFrequency(),
+                series.getStartDate(),
+                series.getEndDate(),
+                series.getOccurrenceCount(),
+                daysOfWeekList,
+                series.getDayOfMonth()
+        );
+
+        Map<Integer, Booking> bookingMap = bookings.stream()
+                .filter(b -> b.getOccurrenceIndex() != null)
+                .collect(Collectors.toMap(
+                        Booking::getOccurrenceIndex,
+                        b -> b,
+                        (b1, b2) -> (b1.getStatus() == BookingStatus.CONFIRMED) ? b1 : (b2.getStatus() == BookingStatus.CONFIRMED ? b2 : (b1.getId() > b2.getId() ? b1 : b2))
+                ));
+
+        Map<Integer, BookingOccurrenceException> exceptionMap = exceptions.stream()
+                .collect(Collectors.toMap(BookingOccurrenceException::getOccurrenceIndex, e -> e, (e1, e2) -> e1));
+
+        ZoneId zoneId = ZoneId.of(series.getTimezone());
+
+        List<RecurringOccurrenceResult> occurrenceResults = new ArrayList<>();
+        int confirmedCount = 0;
+        int conflictCount = 0;
+        int skippedCount = 0;
+
+        for (RecurrenceGenerator.OccurrenceDate occ : occurrenceDates) {
+            int idx = occ.getOccurrenceIndex();
+            Booking b = bookingMap.get(idx);
+            BookingOccurrenceException ex = exceptionMap.get(idx);
+
+            BookingInterval interval = timeService.calculateBookingInterval(
+                    occ.getDate(),
+                    series.getStartLocalTime(),
+                    series.getEndLocalTime(),
+                    zoneId
+            );
+
+            if (b != null) {
+                if (b.getStatus() == BookingStatus.CONFIRMED) {
+                    confirmedCount++;
+                }
+                occurrenceResults.add(RecurringOccurrenceResult.builder()
+                        .occurrenceIndex(idx)
+                        .date(occ.getDate())
+                        .bookingId(b.getId())
+                        .status(b.getStatus().name())
+                        .roomId(b.getRoom().getId())
+                        .roomName(b.getRoom().getName())
+                        .startTime(b.getStartTime())
+                        .endTime(b.getEndTime())
+                        .reason(b.getReason())
+                        .conflictReason(b.getCancelledReason())
+                        .build());
+            } else if (ex != null) {
+                skippedCount++;
+                occurrenceResults.add(RecurringOccurrenceResult.builder()
+                        .occurrenceIndex(idx)
+                        .date(occ.getDate())
+                        .status("SKIPPED")
+                        .roomId(bookings.isEmpty() ? null : bookings.get(0).getRoom().getId())
+                        .roomName(bookings.isEmpty() ? null : bookings.get(0).getRoom().getName())
+                        .startTime(interval.startUtc())
+                        .endTime(interval.endUtc())
+                        .reason(ex.getReason())
+                        .conflictReason(null)
+                        .build());
+            } else {
+                conflictCount++;
+                occurrenceResults.add(RecurringOccurrenceResult.builder()
+                        .occurrenceIndex(idx)
+                        .date(occ.getDate())
+                        .status("CONFLICT")
+                        .roomId(bookings.isEmpty() ? null : bookings.get(0).getRoom().getId())
+                        .roomName(bookings.isEmpty() ? null : bookings.get(0).getRoom().getName())
+                        .startTime(interval.startUtc())
+                        .endTime(interval.endUtc())
+                        .reason(series.getSeriesName())
+                        .conflictReason("Unresolved schedule conflict")
+                        .build());
+            }
+        }
+
+        return RecurringSeriesResponse.builder()
+                .id(series.getId())
+                .userId(series.getUser().getId())
+                .seriesName(series.getSeriesName())
+                .frequency(series.getFrequency())
+                .startDate(series.getStartDate())
+                .endDate(series.getEndDate())
+                .occurrenceCount(series.getOccurrenceCount())
+                .startLocalTime(series.getStartLocalTime())
+                .endLocalTime(series.getEndLocalTime())
+                .timezone(series.getTimezone())
+                .daysOfWeek(series.getDaysOfWeek())
+                .dayOfMonth(series.getDayOfMonth())
+                .status(series.getStatus())
+                .createdAt(series.getCreatedAt())
+                .updatedAt(series.getUpdatedAt())
+                .bookings(bookingResponses)
+                .occurrences(occurrenceResults)
+                .totalOccurrences(occurrenceDates.size())
+                .confirmedCount(confirmedCount)
+                .conflictCount(conflictCount)
+                .skippedCount(skippedCount)
+                .build();
     }
 }

@@ -38,12 +38,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             if (!jwtTokenProvider.isRefreshToken(token)) {
                 Long userId = jwtTokenProvider.getUserIdFromToken(token);
+                String wissenId = jwtTokenProvider.getWissenIdFromToken(token);
                 String email = jwtTokenProvider.getEmailFromToken(token);
                 String role = jwtTokenProvider.getRoleFromToken(token);
                 Long locationId = jwtTokenProvider.getLocationIdFromToken(token);
 
                 if (userId != null && StringUtils.hasText(email) && StringUtils.hasText(role)) {
-                    AuthenticatedUser principal = new AuthenticatedUser(userId, email, role, locationId);
+                    AuthenticatedUser principal = new AuthenticatedUser(userId, wissenId, email, role, locationId);
                     String authority = SecurityConstants.toAuthority(role);
                     List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority));
 

@@ -25,4 +25,5 @@ public class RecurringOccurrenceResult {
     private OffsetDateTime endTime;
     private String reason;
     private String conflictReason;
+    private String operationId;
 }
